@@ -4,9 +4,9 @@ import com.intellij.openapi.components.BaseState
 import org.rust.cargo.runconfig.command.CargoConfigurationOptions
 
 /**
- * Run configuration compatibility layer for platform version 252+.
+ * Run configuration compatibility layer for platform version 251+.
  *
- * In 252+, [CargoConfigurationOptions] exists and can be used for persistent state.
+ * In 251+, [CargoConfigurationOptions] exists and can be used for persistent state.
  */
 object RunConfigCompat {
 

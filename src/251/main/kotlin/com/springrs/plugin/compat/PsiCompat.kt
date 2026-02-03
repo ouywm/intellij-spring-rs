@@ -8,9 +8,9 @@ import org.rust.lang.core.psi.RsMethodCallExpr
 import org.rust.lang.core.psi.RsValueArgumentList
 
 /**
- * PSI compatibility layer for platform version 252+.
+ * PSI compatibility layer for platform version 251+.
  *
- * In 252+, [RsMethodCallExpr] is a first-class PSI element representing `receiver.method(args)`.
+ * In 251+, [RsMethodCallExpr] is a first-class PSI element representing `receiver.method(args)`.
  */
 object PsiCompat {
 

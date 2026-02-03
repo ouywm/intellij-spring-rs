@@ -38,5 +38,5 @@
 - spring-rs leaf icon for `app.toml` / `app-*.toml` config files
 
 #### Platform Compatibility
-- RustRover 2025.2 (252)
+- RustRover 2025.1+ (251)
 - RustRover 2024.1 (241)

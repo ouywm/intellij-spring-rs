@@ -11,7 +11,7 @@ import java.nio.file.Paths
 /**
  * spring-rs New Project Panel — stub for platform 233.
  *
- * The real implementation lives in the 252 source set because it depends on
+ * The real implementation lives in the 251 source set because it depends on
  * [org.rust.cargo.project.settings.ui.RustProjectSettingsPanel] APIs
  * (coroutineScope constructor parameter, start() method) that do not exist in 241.
  *

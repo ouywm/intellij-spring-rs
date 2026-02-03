@@ -18,7 +18,7 @@ class SpringRsRunConfigurationFactory(type: ConfigurationType) : ConfigurationFa
     }
 
     override fun getOptionsClass(): Class<out BaseState> {
-        // Use CargoConfigurationOptions if available (252+), otherwise fall back to default.
+        // Use CargoConfigurationOptions if available (251+), otherwise fall back to default.
         return RunConfigCompat.getOptionsClass() ?: RunConfigurationOptions::class.java
     }
 }

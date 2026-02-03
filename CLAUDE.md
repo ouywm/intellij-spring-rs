@@ -15,7 +15,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ./gradlew test
 
 # Build for different platform versions
-./gradlew -PplatformVersion=252 buildPlugin  # RustRover 2025.2 (default)
+./gradlew -PplatformVersion=251 buildPlugin  # RustRover 2025.1+ (default)
 ./gradlew -PplatformVersion=241 buildPlugin  # IntelliJ 2024.1
 ./gradlew -PplatformVersion=233 buildPlugin  # IntelliJ 2023.3
 ```
@@ -87,7 +87,7 @@ The plugin uses IntelliJ's `CachedValuesManager` extensively:
 
 Build configuration supports multiple IDE versions via property files:
 - `gradle.properties`: Default platform version
-- `gradle-252.properties`: RustRover 2025.2
+- `gradle-251.properties`: RustRover 2025.1+
 - `gradle-241.properties`: IntelliJ 2024.1
 - `gradle-233.properties`: IntelliJ 2023.3
 
@@ -95,7 +95,7 @@ Build configuration supports multiple IDE versions via property files:
 
 - **Rust plugin** (`com.jetbrains.rust`): For Rust PSI types (`RsStructItem`, `RsFunction`, etc.)
 - **TOML plugin** (`org.toml.lang`): For TOML PSI types
-- **JSON module** (`com.intellij.modules.json`): For JSON handling (252+)
+- **JSON module** (`com.intellij.modules.json`): For JSON handling (251+)
 
 ### File Detection
 

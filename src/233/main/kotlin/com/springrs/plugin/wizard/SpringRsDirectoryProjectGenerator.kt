@@ -17,7 +17,7 @@ import javax.swing.Icon
 /**
  * spring-rs Directory Project Generator — stub for platform 233.
  *
- * The real implementation lives in the 252 source set because it depends on
+ * The real implementation lives in the 251 source set because it depends on
  * CoroutineScope injection which is not available in 233.
  *
  * This stub compiles but is never used at runtime because the wizard

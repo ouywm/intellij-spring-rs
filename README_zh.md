@@ -246,8 +246,8 @@ cd spring-rs-plugin
 为不同 IDE 版本构建：
 
 ```bash
-# RustRover 2025.2（默认）
-./gradlew -PplatformVersion=252 buildPlugin
+# RustRover 2025.1+（默认）
+./gradlew -PplatformVersion=251 buildPlugin
 
 # IntelliJ IDEA 2024.1
 ./gradlew -PplatformVersion=241 buildPlugin

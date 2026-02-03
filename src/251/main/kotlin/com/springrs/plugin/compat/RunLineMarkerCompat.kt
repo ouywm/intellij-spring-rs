@@ -8,9 +8,9 @@ import org.rust.lang.core.psi.ext.elementType
 import javax.swing.Icon
 
 /**
- * RunLineMarker compatibility layer for platform version 252+.
+ * RunLineMarker compatibility layer for platform version 251+.
  *
- * In 252+, the `elementType` extension property exists on PsiElement,
+ * In 251+, the `elementType` extension property exists on PsiElement,
  * and Info constructor accepts (Icon, Array<AnAction>).
  */
 object RunLineMarkerCompat {

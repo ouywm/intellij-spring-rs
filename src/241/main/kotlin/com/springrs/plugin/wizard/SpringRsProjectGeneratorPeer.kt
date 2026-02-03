@@ -13,7 +13,7 @@ import javax.swing.JPanel
 /**
  * spring-rs Project Generator Peer — stub for platform 241.
  *
- * The real implementation lives in the 252 source set.
+ * The real implementation lives in the 251 source set.
  * This stub compiles but is never used at runtime because the wizard
  * extension point is disabled in plugin.xml.
  */

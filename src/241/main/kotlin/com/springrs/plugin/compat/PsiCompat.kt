@@ -19,7 +19,7 @@ import org.rust.lang.core.psi.RsValueArgumentList
  *   - getMethodCall() → RsMethodCall if it's a method call (null for field access)
  *   - getFieldLookup() → RsFieldLookup if it's field access
  *
- * Structure in 252:
+ * Structure in 251+:
  * - RsMethodCallExpr represents `receiver.method(args)` directly
  *   - getReceiver() → receiver expression
  *   - getMethodCall() → RsMethodCall
