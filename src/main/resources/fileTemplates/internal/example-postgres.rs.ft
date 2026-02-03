@@ -1,0 +1,18 @@
+use anyhow::Context;
+use spring_postgres::Postgres;
+use spring_web::get;
+use spring_web::{
+    axum::response::{IntoResponse, Json},
+    error::Result,
+    extractor::Component,
+};
+
+#[get("/postgres")]
+pub async fn hello_postgres(Component(pg): Component<Postgres>) -> Result<impl IntoResponse> {
+    let rows = pg
+        .query("select version() as version", &[])
+        .await
+        .context("query postgresql failed")?;
+    let version: String = rows[0].get("version");
+    Ok(Json(version))
+}

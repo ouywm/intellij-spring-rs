@@ -1,0 +1,4 @@
+<idea-plugin>
+    <!-- No additional extensions needed when JSON module is available -->
+    <!-- This file exists only to satisfy the optional dependency declaration -->
+</idea-plugin>

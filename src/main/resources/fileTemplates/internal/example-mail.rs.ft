@@ -1,0 +1,17 @@
+use anyhow::Context;
+use spring_mail::{header::ContentType, AsyncTransport, Mailer, Message};
+use spring_web::axum::response::{IntoResponse, Json};
+use spring_web::{error::Result, extractor::Component, get};
+
+#[get("/send")]
+pub async fn send_mail(Component(mailer): Component<Mailer>) -> Result<impl IntoResponse> {
+    let email = Message::builder()
+        .from("sender@example.com".parse().unwrap())
+        .to("recipient@example.com".parse().unwrap())
+        .subject("Hello from spring-rs")
+        .header(ContentType::TEXT_PLAIN)
+        .body(String::from("This is a test email."))
+        .unwrap();
+    let resp = mailer.send(email).await.context("send mail failed")?;
+    Ok(Json(resp))
+}

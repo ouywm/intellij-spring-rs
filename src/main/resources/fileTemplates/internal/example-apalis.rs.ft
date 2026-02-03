@@ -1,0 +1,17 @@
+use serde::{Deserialize, Serialize};
+use spring_apalis::apalis_redis::RedisStorage;
+use spring_apalis::apalis::prelude::*;
+use spring_web::{axum::response::IntoResponse, extractor::Component, get};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BackgroundJob {
+    pub data: String,
+}
+
+#[get("/start")]
+pub async fn start_job(
+    Component(mut storage): Component<RedisStorage<BackgroundJob>>,
+) -> impl IntoResponse {
+    storage.push(BackgroundJob { data: "test".to_string() }).await.unwrap();
+    "Job started"
+}

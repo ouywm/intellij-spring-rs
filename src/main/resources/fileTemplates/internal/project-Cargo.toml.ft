@@ -1,0 +1,17 @@
+[package]
+name = "${PROJECT_NAME}"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+spring = "0.4"
+${DEPENDENCIES}
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"
+serde_json = "1"
+${EXTRA_DEPS}
+#if(${BUILD_DEPS} != "")
+
+[build-dependencies]
+${BUILD_DEPS}
+#end

@@ -1,0 +1,8 @@
+use spring_job::cron;
+use std::time::SystemTime;
+
+/// Scheduled job that runs every minute
+#[cron("0 * * * * *")]
+pub async fn every_minute_job() {
+    println!("Job executed at: {:?}", SystemTime::now());
+}

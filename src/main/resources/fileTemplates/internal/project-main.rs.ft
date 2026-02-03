@@ -1,0 +1,9 @@
+${IMPORTS}
+
+${AUTO_CONFIG}#[tokio::main]
+async fn main() {
+    App::new()
+${PLUGINS}
+        .run()
+        .await;
+}

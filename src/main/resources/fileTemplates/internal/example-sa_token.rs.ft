@@ -1,0 +1,31 @@
+use serde::{Deserialize, Serialize};
+use spring_sa_token::{LoginIdExtractor, StpUtil};
+use spring_web::{
+    axum::response::{IntoResponse, Json},
+    error::Result,
+    extractor::Json as JsonExtractor,
+    get, post,
+};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LoginRequest {
+    pub username: String,
+    pub password: String,
+}
+
+#[post("/login")]
+pub async fn login(JsonExtractor(req): JsonExtractor<LoginRequest>) -> Result<impl IntoResponse> {
+    let token = StpUtil::login(&req.username).await?;
+    Ok(Json(serde_json::json!({
+        "token": token.as_str(),
+        "message": format!("Welcome, {}!", req.username)
+    })))
+}
+
+#[get("/user/info")]
+pub async fn user_info(LoginIdExtractor(user_id): LoginIdExtractor) -> Result<impl IntoResponse> {
+    Ok(Json(serde_json::json!({
+        "user_id": user_id,
+        "message": "You are authenticated"
+    })))
+}

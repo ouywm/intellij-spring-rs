@@ -1,0 +1,14 @@
+use spring_sea_orm::DbConn;
+use spring_web::get;
+use spring_web::{
+    axum::response::{IntoResponse, Json},
+    error::Result,
+    extractor::Component,
+};
+
+#[get("/")]
+pub async fn list_items(Component(db): Component<DbConn>) -> Result<impl IntoResponse> {
+    // Example: Query all items from a table
+    // let items = YourEntity::find().all(&db).await?;
+    Ok(Json("SeaORM example - create your entities first"))
+}

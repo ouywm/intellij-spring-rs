@@ -1,0 +1,33 @@
+use anyhow::Context;
+use spring_redis::{redis::AsyncCommands, Redis};
+use spring_web::{
+    axum::response::{IntoResponse, Json},
+    error::Result,
+    extractor::{Component, Path},
+};
+use spring_web::{get, post};
+
+#[get("/")]
+pub async fn list_redis_keys(Component(mut redis): Component<Redis>) -> Result<impl IntoResponse> {
+    let keys: Vec<String> = redis.keys("*").await.context("redis request failed")?;
+    Ok(Json(keys))
+}
+
+#[get("/get/{key}")]
+pub async fn get_content(
+    Component(mut redis): Component<Redis>,
+    Path(key): Path<String>,
+) -> Result<impl IntoResponse> {
+    let v: String = redis.get(key).await.context("redis request failed")?;
+    Ok(v)
+}
+
+#[post("/put/{key}")]
+pub async fn set_content(
+    Component(mut redis): Component<Redis>,
+    Path(key): Path<String>,
+    body: String,
+) -> Result<impl IntoResponse> {
+    let v: String = redis.set(key, body).await.context("redis request failed")?;
+    Ok(v)
+}

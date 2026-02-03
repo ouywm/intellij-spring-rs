@@ -1,0 +1,198 @@
+<idea-plugin>
+    <!-- Plugin ID (unique identifier) -->
+    <id>com.spring-rs.plugin</id>
+
+    <!-- Plugin name -->
+    <name>Spring Rs</name>
+
+    <!-- Plugin version -->
+    <version>0.1.0</version>
+
+    <!-- Vendor -->
+    <vendor url="https://github.com/ouywm/intellij-spring-rs">oywm</vendor>
+
+    <!-- Plugin description -->
+    <description><![CDATA[
+        <p><b>spring-rs</b> — IDE support for the <a href="https://github.com/spring-rs/spring-rs">spring-rs</a> framework, inspired by Java's SpringBoot.</p>
+
+        <h3>TOML Configuration</h3>
+        <ul>
+          <li><b>Smart Completion</b> — sections, keys, values based on <code>#[derive(Configurable)]</code> structs</li>
+          <li><b>Navigation</b> — Ctrl+Click to jump between TOML keys and Rust struct fields</li>
+          <li><b>Validation</b> — unknown keys, type mismatches, invalid enums with quick-fixes</li>
+          <li><b>Documentation</b> — hover to see field type, default value, and doc comments</li>
+          <li><b>Enum Completion</b> — all variants from Rust enum definitions</li>
+        </ul>
+
+        <h3>Route Explorer</h3>
+        <ul>
+          <li><b>Tool Window</b> — list all HTTP routes, organized by crate/module/file</li>
+          <li><b>Color-coded Methods</b> — GET/POST/PUT/DELETE/PATCH with distinct colors</li>
+          <li><b>Gutter Icons</b> — HTTP method badges on handler functions</li>
+          <li><b>Search &amp; Filter</b> — by path, method, or handler name</li>
+          <li>Supports <code>#[get("/path")]</code> macros and <code>Router::new().route()</code> builder</li>
+        </ul>
+
+        <h3>Run Configuration</h3>
+        <ul>
+          <li>Dedicated run config with spring-rs gutter icon on <code>main()</code></li>
+          <li>Right-click to Run, Debug, or Edit configuration</li>
+        </ul>
+
+        <h3>Service &amp; Injection</h3>
+        <ul>
+          <li>Gutter icons for services and <code>#[inject]</code> dependencies</li>
+          <li>Click to navigate between services and injection sites</li>
+        </ul>
+
+        <h3>JSON to Rust Struct</h3>
+        <ul>
+          <li>Convert JSON to Rust structs with serde attributes</li>
+          <li>Configurable derives, visibility, rename options</li>
+          <li>Nested structs, <code>Vec&lt;T&gt;</code>, <code>Option&lt;T&gt;</code>, camelCase conversion</li>
+        </ul>
+
+        <h3>Other Features</h3>
+        <ul>
+          <li>Custom icons for <code>app.toml</code> and <code>main.rs</code></li>
+          <li>Auto-detection via <code>Cargo.toml</code> dependencies</li>
+        </ul>
+
+        <p><b>Requires:</b> RustRover 2024.1+ or IntelliJ IDEA Ultimate 2023.3+ with Rust plugin</p>
+        <p><a href="https://github.com/ouywm/intellij-spring-rs">GitHub</a></p>
+    ]]></description>
+
+    <!-- Change notes -->
+    <change-notes><![CDATA[
+        <b>0.1.0</b> — Initial Release
+        <ul>
+          <li>TOML config support: completion, navigation, validation, documentation</li>
+          <li>Route Explorer tool window with search and color-coded methods</li>
+          <li>Dedicated run configuration with custom gutter icon</li>
+          <li>JSON to Rust Struct converter</li>
+          <li>Service and injection markers</li>
+        </ul>
+    ]]></change-notes>
+
+    <!-- Required modules -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>org.toml.lang</depends>
+    <depends>com.jetbrains.rust</depends>
+    <!-- Optional: JSON module for syntax highlighting in JSON to Struct dialog -->
+    <depends optional="true" config-file="json-features.xml">com.intellij.modules.json</depends>
+
+    <!-- Extensions -->
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- JSON to Struct history service -->
+        <applicationService
+            serviceImplementation="com.springrs.plugin.actions.JsonToStructHistoryService"/>
+
+        <!-- File icon provider - spring-rs config files -->
+        <fileIconProvider
+            implementation="com.springrs.plugin.icons.SpringRsConfigFileIconProvider"/>
+        <!-- File icon provider - Rust entry file (main.rs) -->
+        <fileIconProvider
+            implementation="com.springrs.plugin.icons.SpringRsMainFileIconProvider"/>
+
+        <!-- Typed handler - auto trigger completion when typing '[' -->
+        <typedHandler
+            implementation="com.springrs.plugin.completion.TomlTypedHandler"/>
+
+        <!-- Tool window - spring-rs routes -->
+        <toolWindow
+            id="spring-rs Routes"
+            anchor="right"
+            icon="/icons/spring-rust-logo.svg"
+            factoryClass="com.springrs.plugin.toolwindow.SpringRsRoutesToolWindowFactory"/>
+
+        <!-- Run Configuration -->
+        <configurationType implementation="com.springrs.plugin.run.SpringRsRunConfigurationType"/>
+        <runConfigurationProducer implementation="com.springrs.plugin.run.SpringRsRunConfigurationProducer"
+                                  order="first"/>
+
+        <!-- Completion -->
+        <completion.contributor
+            language="TOML"
+            implementationClass="com.springrs.plugin.completion.SpringRsConfigCompletionContributor"
+            id="SpringRsConfigCompletion"
+            order="first"/>
+
+        <!-- Annotator - TOML validation -->
+        <annotator
+            language="TOML"
+            implementationClass="com.springrs.plugin.annotator.SpringRsConfigAnnotator"/>
+
+        <!-- Documentation -->
+        <lang.documentationProvider
+            language="TOML"
+            implementationClass="com.springrs.plugin.documentation.SpringRsConfigDocumentationProvider"/>
+
+        <!-- Line markers -->
+        <codeInsight.lineMarkerProvider
+            language="Rust"
+            implementationClass="com.springrs.plugin.markers.SpringRsLineMarkerProvider"/>
+        <codeInsight.lineMarkerProvider
+            language="Rust"
+            implementationClass="com.springrs.plugin.markers.SpringRsRouteLineMarkerProvider"/>
+        <codeInsight.lineMarkerProvider
+            language="Rust"
+            implementationClass="com.springrs.plugin.markers.SpringRsServiceLineMarkerProvider"/>
+        <codeInsight.lineMarkerProvider
+            language="Rust"
+            implementationClass="com.springrs.plugin.markers.SpringRsInjectLineMarkerProvider"/>
+        <!-- Run gutter icon - override Rust default for spring-rs apps -->
+        <runLineMarkerContributor language="Rust"
+                                  implementationClass="com.springrs.plugin.run.SpringRsRunLineMarkerContributor"
+                                  order="first"/>
+
+        <!-- References -->
+        <psi.referenceContributor
+            language="TOML"
+            implementation="com.springrs.plugin.references.SpringRsReferenceContributor"/>
+
+        <!-- Directory Project Generator - New Project Wizard (for non-Java IDEs like RustRover) -->
+        <!-- TODO: Temporarily disabled, waiting for spring-rs-initializr service
+        <directoryProjectGenerator
+            implementation="com.springrs.plugin.wizard.SpringRsDirectoryProjectGenerator"/>
+        -->
+
+        <!-- Internal File Templates for project generation -->
+        <internalFileTemplate name="project-Cargo.toml"/>
+        <internalFileTemplate name="project-main.rs"/>
+        <internalFileTemplate name="project-gitignore"/>
+        <internalFileTemplate name="config-app.toml"/>
+        <internalFileTemplate name="config-app-dev.toml"/>
+        <internalFileTemplate name="config-app-prod.toml"/>
+        <internalFileTemplate name="config-app-test.toml"/>
+        <internalFileTemplate name="example-web.rs"/>
+        <internalFileTemplate name="example-job.rs"/>
+        <internalFileTemplate name="example-stream.rs"/>
+        <internalFileTemplate name="example-mail.rs"/>
+        <internalFileTemplate name="example-redis.rs"/>
+        <internalFileTemplate name="example-opendal.rs"/>
+        <internalFileTemplate name="example-postgres.rs"/>
+        <internalFileTemplate name="example-sqlx.rs"/>
+        <internalFileTemplate name="example-sea_orm.rs"/>
+        <internalFileTemplate name="example-apalis.rs"/>
+        <internalFileTemplate name="example-opentelemetry.rs"/>
+        <internalFileTemplate name="example-sa_token.rs"/>
+        <internalFileTemplate name="example-grpc.rs"/>
+        <internalFileTemplate name="grpc-build.rs"/>
+        <internalFileTemplate name="grpc-server.rs"/>
+        <internalFileTemplate name="grpc-helloworld.proto"/>
+
+    </extensions>
+
+    <!-- Actions -->
+    <actions>
+        <!-- JSON to Rust Struct -->
+        <action id="SpringRs.JsonToStruct"
+                class="com.springrs.plugin.actions.JsonToStructAction"
+                text="JSON to Rust Struct"
+                description="Convert JSON to Rust struct definitions"
+                icon="/icons/spring-rs.svg">
+            <add-to-group group-id="EditorPopupMenu" anchor="first"/>
+            <add-to-group group-id="GenerateGroup" anchor="first"/>
+        </action>
+    </actions>
+</idea-plugin>

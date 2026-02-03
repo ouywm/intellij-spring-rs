@@ -1,0 +1,7 @@
+use spring_stream::stream_listener;
+
+/// Stream listener for handling messages
+#[stream_listener("my-stream")]
+pub async fn handle_message(message: String) {
+    println!("Received: {}", message);
+}

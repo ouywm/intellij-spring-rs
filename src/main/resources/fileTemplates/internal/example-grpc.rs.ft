@@ -1,0 +1,15 @@
+// gRPC Example
+//
+// To use gRPC:
+// 1. Create proto files in proto/ directory
+// 2. Add build.rs to compile proto files
+// 3. Implement the service trait
+//
+// Example proto file (proto/helloworld.proto):
+// syntax = "proto3";
+// package helloworld;
+// service Greeter {
+//     rpc SayHello (HelloRequest) returns (HelloReply);
+// }
+// message HelloRequest { string name = 1; }
+// message HelloReply { string message = 1; }

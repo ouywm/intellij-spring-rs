@@ -1,0 +1,9 @@
+use spring::tracing::info;
+use spring_web::axum::response::IntoResponse;
+use spring_web::get;
+
+#[get("/")]
+pub async fn hello_world() -> impl IntoResponse {
+    info!("hello world called");
+    "hello world"
+}

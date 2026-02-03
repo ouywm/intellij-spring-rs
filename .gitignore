@@ -1,0 +1,67 @@
+.idea/
+*.iml
+*.iws
+*.ipr
+.idea_modules/
+out/
+
+# IntelliJ Platform Gradle Plugin
+.intellijPlatform/
+
+# Eclipse
+.project
+.classpath
+
+# ==================== Build ====================
+# Gradle
+.gradle/
+.gradle-user-home/
+build/
+**/build/
+!src/**/build/
+gradle-app.setting
+.gradletasknamecache
+
+# Gradle wrapper (keep these)
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# Kotlin
+.kotlin/
+
+# ==================== Compiled / Package ====================
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.zip
+*.tar.gz
+*.rar
+
+# ==================== Logs & Temp ====================
+*.log
+*.tmp
+*.bak
+*.swp
+*.ctxt
+
+# JVM crash logs
+hs_err_pid*
+replay_pid*
+
+# J2ME
+.mtj.tmp/
+
+# CMake
+cmake-build-*/
+
+# ==================== OS ====================
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Linux / editors
+*~

@@ -1,0 +1,6 @@
+use spring_web::{get, axum::response::IntoResponse};
+
+#[get("/")]
+pub async fn hello_world() -> impl IntoResponse {
+    "Hello, spring-rs!"
+}
