@@ -68,7 +68,8 @@ class SpringRsTomlEnumValueReferenceProvider : PsiReferenceProvider() {
             val outerKeyName = outerKeyValue.key.text ?: return null
             val sectionStruct = parser.resolveStructForSection(sectionName) ?: return null
             val outerField = parser.resolveFieldForKeyPath(sectionStruct, outerKeyName) ?: return null
-            val outerStruct = parser.resolveFieldType(outerField.psiElement, parser.getTypeIndex().structs) ?: return null
+            val outerStruct =
+                parser.resolveFieldType(outerField.psiElement, parser.getTypeIndex().structs) ?: return null
 
             return parser.resolveFieldForKeyPath(outerStruct, keyName)
         }
@@ -102,7 +103,10 @@ private class SpringRsTomlEnumValueReference(
         val field = resolveFieldForValueContext(parser, keyValue, keyName) ?: return null
         if (!field.isEnumType || field.enumTypeName.isNullOrBlank()) return null
 
+        // enumTypeName is now a qualified name (e.g., "spring_web::config::LogLevel"),
+        // so findEnumByTypeName can directly match the correct enum.
         val enumItem = parser.findEnumByTypeName(field.enumTypeName) ?: return null
+
         val variant = resolveEnumVariant(enumItem, value)
         // If the value doesn't match a variant, still resolve to the enum itself:
         // - avoids IDE "Cannot resolve symbol" diagnostics
@@ -134,7 +138,8 @@ private class SpringRsTomlEnumValueReference(
             val outerKeyName = outerKeyValue.key.text ?: return null
             val sectionStruct = parser.resolveStructForSection(sectionName) ?: return null
             val outerField = parser.resolveFieldForKeyPath(sectionStruct, outerKeyName) ?: return null
-            val outerStruct = parser.resolveFieldType(outerField.psiElement, parser.getTypeIndex().structs) ?: return null
+            val outerStruct =
+                parser.resolveFieldType(outerField.psiElement, parser.getTypeIndex().structs) ?: return null
 
             return parser.resolveFieldForKeyPath(outerStruct, keyName)
         }

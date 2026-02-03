@@ -7,7 +7,7 @@ plugins {
 
 }
 
-val platformVersion: String = providers.gradleProperty("platformVersion").orNull ?: "252"
+val platformVersion: String = providers.gradleProperty("platformVersion").orNull ?: "251"
 
 val platformProps = Properties().apply {
     val f = file("gradle-$platformVersion.properties")
@@ -75,8 +75,8 @@ dependencies {
             plugin(rustPlugin)
         }
         bundledPlugin("org.toml.lang")
-        // com.intellij.modules.json exists only in 252+
-        if (platformVersion.toInt() >= 252) {
+        // com.intellij.modules.json exists only in 251+
+        if (platformVersion.toInt() >= 251) {
             bundledPlugin("com.intellij.modules.json")
         }
     }

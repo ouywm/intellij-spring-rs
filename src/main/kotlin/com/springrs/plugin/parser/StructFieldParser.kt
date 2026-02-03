@@ -92,7 +92,8 @@ object StructFieldParser {
             // Detect enum types.
             val enumType = field.typeReference?.let { RustTypeUtils.resolveEnumType(it) }
             val isEnumType = enumType != null
-            val enumTypeName = enumType?.name
+            // Store qualified name for precise lookup (avoids same-name enum conflicts across modules)
+            val enumTypeName = enumType?.let { RustConfigStructParser.getQualifiedName(it) }
 
             // Extract default value info.
             val defaultFunction = attributes.filterIsInstance<FieldAttribute.DefaultWith>().firstOrNull()?.functionName

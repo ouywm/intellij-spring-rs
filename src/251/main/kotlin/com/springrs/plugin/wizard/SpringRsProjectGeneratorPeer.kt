@@ -33,6 +33,8 @@ class SpringRsProjectGeneratorPeer(
         updateListener = { checkValid?.run() }
     )
 
+    private var dialogPanel: DialogPanel? = null
+
     init {
         Disposer.register(this, newProjectPanel)
     }
@@ -43,25 +45,27 @@ class SpringRsProjectGeneratorPeer(
 
     override fun getComponent(myLocationField: TextFieldWithBrowseButton, checkValid: Runnable): JComponent {
         this.checkValid = checkValid
-        return getComponent()
+        return getOrCreateComponent()
     }
 
-    @Suppress("OVERRIDE_DEPRECATION")
-    override fun getComponent(): JComponent {
-        val dialogPanel: DialogPanel = panel {
+    private fun getOrCreateComponent(): JComponent {
+        dialogPanel?.let { return it }
+
+        val panel: DialogPanel = panel {
             newProjectPanel.attachTo(this)
         }
 
         // Use addPropertyChangeListener like Rust plugin does
         // When "ancestor" property changes (panel becomes visible), start toolchain detection
-        dialogPanel.addPropertyChangeListener { event ->
+        panel.addPropertyChangeListener { event ->
             if (event.propertyName == "ancestor") {
-                val modalityState = ModalityState.stateForComponent(dialogPanel)
+                val modalityState = ModalityState.stateForComponent(panel)
                 newProjectPanel.start(modalityState)
             }
         }
 
-        return dialogPanel
+        dialogPanel = panel
+        return panel
     }
 
     override fun validate(): ValidationInfo? {
@@ -69,8 +73,8 @@ class SpringRsProjectGeneratorPeer(
             newProjectPanel.validateSettings()
             null
         } catch (e: ConfigurationException) {
-            @Suppress("DEPRECATION")
-            ValidationInfo(e.message ?: "")
+            // Use title property instead of deprecated getMessage() TODO 已处理 DEPRECATION
+            ValidationInfo(e.title ?: e.localizedMessage ?: "")
         }
     }
 

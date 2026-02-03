@@ -586,13 +586,21 @@ class RustConfigStructParser(private val project: Project) {
         // First try the reverse index; return the first match.
         typeIndex.prefixToStruct[sectionName]?.firstOrNull()?.let { return it }
 
-        // Special-case: logger -> LoggerConfig
+        // Special-case: map section name to struct name for known spring-rs configs
+        // that might not have explicit config_prefix attribute.
         val structName = when (sectionName) {
             "logger" -> "LoggerConfig"
             else -> null
         }
 
-        return structName?.let { typeIndex.structs[it] }
+        if (structName != null) {
+            // Try to find struct by simple name suffix (qualified name ends with "::StructName")
+            typeIndex.structs.entries.find { (qualifiedName, _) ->
+                qualifiedName.endsWith("::$structName") || qualifiedName == structName
+            }?.value?.let { return it }
+        }
+
+        return null
     }
 
     /**

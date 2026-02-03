@@ -101,6 +101,7 @@ private class SpringRsTomlKeySegmentReference(
      * Strategy:
      * 1) Prefer matches in the current crate
      * 2) If not found, fall back to matches from the current Cargo package + its dependency graph
+     * 3) If still not found, try parser.findStructByPrefix() which has special-case handling
      */
     private fun resolveStructForSectionInCrate(
         parser: RustConfigStructParser,
@@ -177,7 +178,20 @@ private class SpringRsTomlKeySegmentReference(
             if (ok) return currentStruct
         }
 
-        return null
+        // Fallback: use parser.findStructByPrefix() which has special-case handling
+        // for known spring-rs sections like "logger" -> LoggerConfig
+        if (parts.size == 1) {
+            return parser.findStructByPrefix(rootPrefix, index)
+        } else {
+            // For nested sections like "web.server", resolve step by step
+            var currentStruct = parser.findStructByPrefix(rootPrefix, index) ?: return null
+            for (i in 1 until parts.size) {
+                val part = parts[i]
+                val field = parser.findFieldInStruct(currentStruct, part) ?: return null
+                currentStruct = parser.resolveFieldType(field.psiElement, index.structs) ?: return null
+            }
+            return currentStruct
+        }
     }
 
     /**
@@ -201,7 +215,15 @@ private class SpringRsTomlKeySegmentReference(
         val normalizedCrateRoot = crateRoot.trimEnd('/')
 
         // Collect all structs that match the prefix.
-        val structsWithPrefix = index.prefixToStruct[rootPrefix] ?: emptyList()
+        var structsWithPrefix = index.prefixToStruct[rootPrefix] ?: emptyList()
+
+        // If no structs found in prefixToStruct, try findStructByPrefix fallback
+        if (structsWithPrefix.isEmpty()) {
+            val fallbackStruct = parser.findStructByPrefix(rootPrefix, index)
+            if (fallbackStruct != null) {
+                structsWithPrefix = listOf(fallbackStruct)
+            }
+        }
 
         val candidates = structsWithPrefix.filter { struct ->
             val structPath = struct.containingFile?.virtualFile?.path ?: return@filter false

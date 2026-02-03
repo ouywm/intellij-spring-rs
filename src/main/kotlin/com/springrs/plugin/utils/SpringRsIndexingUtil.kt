@@ -1,11 +1,9 @@
 package com.springrs.plugin.utils
 
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
-import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
-import com.intellij.psi.PsiManager
 import java.util.concurrent.atomic.AtomicBoolean
 
 object SpringRsIndexingUtil {
@@ -28,13 +26,8 @@ object SpringRsIndexingUtil {
 
         DumbService.getInstance(project).runWhenSmart {
             try {
-                val analyzer = DaemonCodeAnalyzer.getInstance(project)
-                val psiManager = PsiManager.getInstance(project)
-                FileEditorManager.getInstance(project).openFiles.forEach { vf ->
-                    psiManager.findFile(vf)?.let { psiFile ->
-                        analyzer.restart(psiFile)
-                    }
-                }
+                // Use restart() without parameters - restarts highlighting for all open files  TODO 已处理 DEPRECATION
+                DaemonCodeAnalyzer.getInstance(project).restart()
             } finally {
                 scheduled.set(false)
             }
