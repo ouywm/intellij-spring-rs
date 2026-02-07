@@ -122,7 +122,6 @@ object SpringRsRouteIndex {
         val routeInfos = SpringRsRouteUtil.extractAttributeRoutes(fn)
         for (info in routeInfos) {
             val pathWithNest = SpringRsRouteUtil.joinPaths(nestPrefix, info.path)
-            // Apply global_prefix.
             val fullPath = if (globalPrefix != null) {
                 SpringRsRouteUtil.joinPaths(globalPrefix, pathWithNest)
             } else {

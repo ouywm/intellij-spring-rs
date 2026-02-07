@@ -1,0 +1,63 @@
+use sea_orm::Set;
+use serde::Deserialize;
+use ${entityModulePath}::${moduleName};
+#if($addValidate)
+use validator::Validate;
+#end
+#if($tableComment != "")
+
+/// Create ${tableComment}
+#else
+
+/// Create ${entityName}
+#end
+#[derive(${dtoBaseDerives}#if($extraDerives != ""), ${extraDerives}#end)]
+pub struct $dtoCreateName {
+#foreach($column in $insertColumns)
+#if($column.comment != "")
+    /// $column.comment
+#end
+    pub $column.fieldName: $column.fullRustType,
+#end
+}
+
+/// Convert CreateDto → ActiveModel for insert
+impl From<$dtoCreateName> for ${moduleName}::ActiveModel {
+    fn from(dto: $dtoCreateName) -> Self {
+        Self {
+#foreach($column in $insertColumns)
+            $column.fieldName: Set(dto.$column.fieldName),
+#end
+            ..Default::default()
+        }
+    }
+}
+#if($tableComment != "")
+
+/// Update ${tableComment}
+#else
+
+/// Update ${entityName}
+#end
+#[derive(${dtoBaseDerives}#if($extraDerives != ""), ${extraDerives}#end)]
+pub struct $dtoUpdateName {
+#foreach($column in $updateColumns)
+#if($column.comment != "")
+    /// $column.comment
+#end
+    pub $column.fieldName: Option<$column.rustType>,
+#end
+}
+
+/// Apply UpdateDto fields to an existing ActiveModel (partial update)
+impl $dtoUpdateName {
+    pub fn apply_to(self, model: &mut ${moduleName}::ActiveModel) {
+#foreach($column in $updateColumns)
+#if($column.isEntityNullable)
+        if let Some(v) = self.$column.fieldName { model.$column.fieldName = Set(Some(v)); }
+#else
+        if let Some(v) = self.$column.fieldName { model.$column.fieldName = Set(v); }
+#end
+#end
+    }
+}

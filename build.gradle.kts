@@ -75,6 +75,8 @@ dependencies {
             plugin(rustPlugin)
         }
         bundledPlugin("org.toml.lang")
+        // Database Tools for Sea-ORM code generation (optional at runtime)
+        bundledPlugin("com.intellij.database")
         // com.intellij.modules.json exists only in 251+
         if (platformVersion.toInt() >= 251) {
             bundledPlugin("com.intellij.modules.json")

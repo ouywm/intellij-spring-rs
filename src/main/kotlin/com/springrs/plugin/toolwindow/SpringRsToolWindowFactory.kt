@@ -7,21 +7,20 @@ import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.content.ContentFactory
 import com.springrs.plugin.SpringRsBundle
 
-class SpringRsRoutesToolWindowFactory : ToolWindowFactory {
+class SpringRsToolWindowFactory : ToolWindowFactory {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         // Keep `id` stable for lookup, but localize the visible title.
-        toolWindow.stripeTitle = SpringRsBundle.message("springrs.route.marker.name")
-        toolWindow.title = SpringRsBundle.message("springrs.route.marker.name")
+        toolWindow.stripeTitle = SpringRsBundle.message("springrs.toolwindow.title")
+        toolWindow.title = SpringRsBundle.message("springrs.toolwindow.title")
 
-        val routesToolWindow = SpringRsRoutesToolWindow(project)
+        val springRsToolWindow = SpringRsToolWindow(project)
         val content = ContentFactory.getInstance().createContent(
-            routesToolWindow.getContent(),
+            springRsToolWindow.getContent(),
             "",
             false
         )
         toolWindow.contentManager.addContent(content)
 
-        // Tie all listeners/async tasks in this toolwindow to the toolwindow's lifecycle (not the Project).
-        Disposer.register(toolWindow.disposable, routesToolWindow)
+        Disposer.register(toolWindow.disposable, springRsToolWindow)
     }
 }

@@ -15,7 +15,7 @@ import com.springrs.plugin.SpringRsBundle
 import com.springrs.plugin.icons.SpringRsIcons
 import com.springrs.plugin.routes.SpringRsConfigPrefixUtil
 import com.springrs.plugin.routes.SpringRsRouteUtil
-import com.springrs.plugin.toolwindow.SpringRsRoutesToolWindow
+import com.springrs.plugin.toolwindow.SpringRsToolWindow
 import com.springrs.plugin.utils.CargoUtils
 import org.rust.lang.core.psi.RsFunction
 import org.rust.lang.core.psi.RsMethodCall
@@ -165,7 +165,7 @@ class SpringRsRouteLineMarkerProvider : LineMarkerProviderDescriptor(), DumbAwar
          */
         private fun locateInToolWindow(project: com.intellij.openapi.project.Project, route: RouteInfo) {
             val toolWindowManager = ToolWindowManager.getInstance(project)
-            val toolWindow = toolWindowManager.getToolWindow(SpringRsRoutesToolWindow.TOOL_WINDOW_ID) ?: return
+            val toolWindow = toolWindowManager.getToolWindow(SpringRsToolWindow.TOOL_WINDOW_ID) ?: return
 
             // Pass current file path to make matching more precise.
             val filePath = element.containingFile?.virtualFile?.path
@@ -176,20 +176,20 @@ class SpringRsRouteLineMarkerProvider : LineMarkerProviderDescriptor(), DumbAwar
                 val content = toolWindow.contentManager.getContent(0) ?: return@activate
                 val component = content.component
 
-                // Find SpringRsRoutesToolWindow instance and locate the route (including file path).
+                // Find SpringRsToolWindow instance and locate the route (including file path).
                 findRoutesToolWindow(component)?.locateRoute(route.method, route.path, filePath)
             }
         }
 
         /**
-         * Finds SpringRsRoutesToolWindow from the component tree.
+         * Finds SpringRsToolWindow from the component tree.
          */
-        private fun findRoutesToolWindow(component: java.awt.Component): SpringRsRoutesToolWindow? {
-            // Tool window content is a panel returned by SpringRsRoutesToolWindow.getContent().
+        private fun findRoutesToolWindow(component: java.awt.Component): SpringRsToolWindow? {
+            // Tool window content is a panel returned by SpringRsToolWindow.getContent().
             // We retrieve the instance via client property.
             if (component is javax.swing.JComponent) {
-                val toolWindow = component.getClientProperty(SpringRsRoutesToolWindow.TOOL_WINDOW_KEY)
-                if (toolWindow is SpringRsRoutesToolWindow) {
+                val toolWindow = component.getClientProperty(SpringRsToolWindow.TOOL_WINDOW_KEY)
+                if (toolWindow is SpringRsToolWindow) {
                     return toolWindow
                 }
             }

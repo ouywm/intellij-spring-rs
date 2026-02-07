@@ -172,6 +172,69 @@ object SpringRsConstants {
      */
     const val DERIVE_JSON_SCHEMA = "JsonSchema"
 
+    /**
+     * `PartialEq` derive macro (std).
+     */
+    const val DERIVE_PARTIAL_EQ = "PartialEq"
+
+    /**
+     * `Eq` derive macro (std).
+     */
+    const val DERIVE_EQ = "Eq"
+
+    /**
+     * `Default` derive macro (std).
+     */
+    const val DERIVE_DEFAULT = "Default"
+
+    /**
+     * `Hash` derive macro (std).
+     */
+    const val DERIVE_HASH = "Hash"
+
+    /**
+     * `Builder` derive macro (bon).
+     */
+    const val DERIVE_BUILDER = "Builder"
+
+    /**
+     * `Validate` derive macro (validator).
+     */
+    const val DERIVE_VALIDATE = "Validate"
+
+    /**
+     * `Service` derive macro (spring-rs).
+     */
+    const val DERIVE_SERVICE = "Service"
+
+    // ==================== Sea-ORM Derive Macros ====================
+
+    /** `DeriveEntityModel` derive macro (sea-orm). */
+    const val SEA_ORM_DERIVE_ENTITY_MODEL = "DeriveEntityModel"
+
+    /** `EnumIter` derive macro (sea-orm). */
+    const val SEA_ORM_ENUM_ITER = "EnumIter"
+
+    /** `DeriveRelation` derive macro (sea-orm). */
+    const val SEA_ORM_DERIVE_RELATION = "DeriveRelation"
+
+    // ==================== Sea-ORM Type Names ====================
+
+    /** `Decimal` type (rust_decimal). */
+    const val TYPE_DECIMAL = "Decimal"
+
+    /** `DateTime` type (sea-orm / chrono). */
+    const val TYPE_DATE_TIME = "DateTime"
+
+    /** `DateTimeWithTimeZone` type (sea-orm / chrono). */
+    const val TYPE_DATE_TIME_WITH_TZ = "DateTimeWithTimeZone"
+
+    /** `Date` type (sea-orm / chrono). */
+    const val TYPE_DATE = "Date"
+
+    /** `Time` type (sea-orm / chrono). */
+    const val TYPE_TIME = "Time"
+
 
     /**
      * `rename_all` attribute.

@@ -80,6 +80,8 @@
     <depends>com.jetbrains.rust</depends>
     <!-- Optional: JSON module for syntax highlighting in JSON to Struct dialog -->
     <depends optional="true" config-file="json-features.xml">com.intellij.modules.json</depends>
+    <!-- Optional: Database Tools for Sea-ORM code generation from tables -->
+    <depends optional="true" config-file="database-features.xml">com.intellij.database</depends>
 
     <!-- Extensions -->
     <extensions defaultExtensionNs="com.intellij">
@@ -103,7 +105,7 @@
             id="spring-rs Routes"
             anchor="right"
             icon="/icons/spring-rust-logo.svg"
-            factoryClass="com.springrs.plugin.toolwindow.SpringRsRoutesToolWindowFactory"/>
+            factoryClass="com.springrs.plugin.toolwindow.SpringRsToolWindowFactory"/>
 
         <!-- Run Configuration -->
         <configurationType implementation="com.springrs.plugin.run.SpringRsRunConfigurationType"/>
@@ -117,15 +119,41 @@
             id="SpringRsConfigCompletion"
             order="first"/>
 
+        <!-- Completion - #[auto_config] configurator types -->
+        <completion.contributor
+            language="Rust"
+            implementationClass="com.springrs.plugin.completion.SpringRsAutoConfigCompletionContributor"
+            id="SpringRsAutoConfigCompletion"
+            order="first"/>
+
         <!-- Annotator - TOML validation -->
         <annotator
             language="TOML"
             implementationClass="com.springrs.plugin.annotator.SpringRsConfigAnnotator"/>
 
+        <!-- Annotator - Environment variable validation in TOML -->
+        <annotator
+            language="TOML"
+            implementationClass="com.springrs.plugin.annotator.SpringRsEnvVarAnnotator"/>
+
+        <!-- Annotator - Route conflict detection -->
+        <annotator
+            language="Rust"
+            implementationClass="com.springrs.plugin.annotator.SpringRsRouteConflictAnnotator"/>
+
+        <!-- Annotator - Dependency injection validation -->
+        <annotator
+            language="Rust"
+            implementationClass="com.springrs.plugin.annotator.SpringRsDiValidationAnnotator"/>
+
         <!-- Documentation -->
         <lang.documentationProvider
             language="TOML"
             implementationClass="com.springrs.plugin.documentation.SpringRsConfigDocumentationProvider"/>
+        <lang.documentationProvider
+            language="TOML"
+            implementationClass="com.springrs.plugin.documentation.SpringRsEnvVarDocumentationProvider"
+            order="first"/>
 
         <!-- Line markers -->
         <codeInsight.lineMarkerProvider
@@ -136,14 +164,37 @@
             implementationClass="com.springrs.plugin.markers.SpringRsRouteLineMarkerProvider"/>
         <codeInsight.lineMarkerProvider
             language="Rust"
+            implementationClass="com.springrs.plugin.markers.SpringRsJobLineMarkerProvider"/>
+        <codeInsight.lineMarkerProvider
+            language="Rust"
             implementationClass="com.springrs.plugin.markers.SpringRsServiceLineMarkerProvider"/>
         <codeInsight.lineMarkerProvider
             language="Rust"
             implementationClass="com.springrs.plugin.markers.SpringRsInjectLineMarkerProvider"/>
+        <codeInsight.lineMarkerProvider
+            language="Rust"
+            implementationClass="com.springrs.plugin.markers.SpringRsStreamListenerLineMarkerProvider"/>
+        <codeInsight.lineMarkerProvider
+            language="Rust"
+            implementationClass="com.springrs.plugin.markers.SpringRsCacheLineMarkerProvider"/>
+        <codeInsight.lineMarkerProvider
+            language="Rust"
+            implementationClass="com.springrs.plugin.markers.SpringRsSaTokenLineMarkerProvider"/>
+        <codeInsight.lineMarkerProvider
+            language="Rust"
+            implementationClass="com.springrs.plugin.markers.SpringRsSocketIoLineMarkerProvider"/>
+        <codeInsight.lineMarkerProvider
+            language="Rust"
+            implementationClass="com.springrs.plugin.markers.SpringRsMiddlewaresLineMarkerProvider"/>
+        <!-- ProblemDetails: intentionally not adding a line marker to avoid misleading error icon -->
         <!-- Run gutter icon - override Rust default for spring-rs apps -->
         <runLineMarkerContributor language="Rust"
                                   implementationClass="com.springrs.plugin.run.SpringRsRunLineMarkerContributor"
                                   order="first"/>
+
+        <!-- Search Everywhere - spring-rs items in global search -->
+        <searchEverywhereContributor
+            implementation="com.springrs.plugin.search.SpringRsSearchEverywhereContributor$Factory"/>
 
         <!-- References -->
         <psi.referenceContributor

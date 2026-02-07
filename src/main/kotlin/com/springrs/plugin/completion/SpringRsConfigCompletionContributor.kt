@@ -76,5 +76,15 @@ class SpringRsConfigCompletionContributor : CompletionContributor() {
                 .inside(org.toml.lang.psi.TomlInlineTable::class.java),
             SpringRsInlineTableKeyCompletionProvider()
         )
+
+        // 5. Provide completion for environment variables in string values.
+        // Pattern: "${VAR:default}" inside TOML string literals.
+        // Triggered when the user types `${` inside a string value.
+        extend(
+            CompletionType.BASIC,
+            PlatformPatterns.psiElement()
+                .inside(TomlKeyValue::class.java),
+            SpringRsEnvVarCompletionProvider()
+        )
     }
 }

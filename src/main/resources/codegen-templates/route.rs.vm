@@ -1,0 +1,55 @@
+use ${dtoModulePath}::${moduleName}_dto::{${dtoCreateName}, ${dtoUpdateName}};
+use ${voModulePath}::${moduleName}_vo::${voName};
+use ${serviceModulePath}::${moduleName}_service::${serviceName};
+use spring_web::axum::response::IntoResponse;
+use spring_web::delete;
+use spring_web::error::Result;
+use spring_web::extractor::{Component, Json, Path};
+use spring_web::get;
+use spring_web::post;
+use spring_web::put;
+
+#[get("${routePrefix}/${moduleName}s")]
+pub async fn list(
+    Component(service): Component<${serviceName}>,
+) -> Result<impl IntoResponse> {
+    let items = service.find_all().await?;
+    Ok(Json(items))
+}
+
+#[get("${routePrefix}/${moduleName}s/{id}")]
+pub async fn get_by_id(
+    Component(service): Component<${serviceName}>,
+    Path(id): Path<${primaryKeyType}>,
+) -> Result<impl IntoResponse> {
+    let item = service.find_by_id(id).await?;
+    Ok(Json(item))
+}
+
+#[post("${routePrefix}/${moduleName}s")]
+pub async fn create(
+    Component(service): Component<${serviceName}>,
+    Json(dto): Json<${dtoCreateName}>,
+) -> Result<impl IntoResponse> {
+    let result = service.create(dto).await?;
+    Ok(Json(result))
+}
+
+#[put("${routePrefix}/${moduleName}s/{id}")]
+pub async fn update(
+    Component(service): Component<${serviceName}>,
+    Path(id): Path<${primaryKeyType}>,
+    Json(dto): Json<${dtoUpdateName}>,
+) -> Result<impl IntoResponse> {
+    let result = service.update(id, dto).await?;
+    Ok(Json(result))
+}
+
+#[delete("${routePrefix}/${moduleName}s/{id}")]
+pub async fn delete(
+    Component(service): Component<${serviceName}>,
+    Path(id): Path<${primaryKeyType}>,
+) -> Result<impl IntoResponse> {
+    service.delete_by_id(id).await?;
+    Ok(Json("deleted"))
+}

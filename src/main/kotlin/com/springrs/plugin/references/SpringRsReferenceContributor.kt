@@ -28,6 +28,12 @@ class SpringRsReferenceContributor : PsiReferenceContributor() {
             psiElement(TomlLiteral::class.java),
             SpringRsTomlEnumValueReferenceProvider()
         )
+
+        // ${VAR} references in TOML string values -> navigate to .env file definitions.
+        registrar.registerReferenceProvider(
+            psiElement(TomlLiteral::class.java),
+            SpringRsTomlEnvVarReferenceProvider()
+        )
     }
 }
 

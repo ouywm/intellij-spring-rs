@@ -119,19 +119,40 @@ class SpringRsSectionCompletionProvider : CompletionProvider<CompletionParameter
         // Use case-insensitive matching.
         val caseInsensitiveResult = result.caseInsensitive()
 
-        // Create completion items (exclude existing sections).
+        // Create completion items.
         var addedCount = 0
         prefixes.forEach { prefix ->
-            // Skip existing sections.
-            if (prefix in existingSections) {
+            val struct = typeIndex.prefixToStruct[prefix]?.firstOrNull()
+            val structName = struct?.name
+
+            // Check if section already exists.
+            val alreadyExists = prefix in existingSections
+
+            // Check if struct has nested struct fields (can have child sections like [web.openapi]).
+            val hasNestedFields = struct?.let { s ->
+                StructFieldParser.parseStructFields(s, includeDocumentation = false) { field ->
+                    parser.resolveFieldType(field, typeIndex.structs)
+                }.any { it.isStructType && !it.isFlatten() }
+            } ?: false
+
+            // Skip existing sections that have no nested fields.
+            // Keep existing sections with nested fields so user can type [web. to add [web.openapi].
+            if (alreadyExists && !hasNestedFields) {
                 return@forEach
             }
 
-            val structName = typeIndex.prefixToStruct[prefix]?.firstOrNull()?.name
             val lookupElement = LookupElementBuilder.create(prefix)
                 .withIcon(AllIcons.Nodes.ConfigFolder)
                 .withBoldness(true)
                 .withTypeText(structName ?: SpringRsBundle.message("springrs.completion.section.typeText.default"))
+                .let { builder ->
+                    // Mark existing sections with a tail text hint.
+                    if (alreadyExists) {
+                        builder.withTailText(" (has nested sections)", true)
+                    } else {
+                        builder
+                    }
+                }
 
             caseInsensitiveResult.addElement(lookupElement)
             addedCount++

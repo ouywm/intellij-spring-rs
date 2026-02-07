@@ -1,0 +1,58 @@
+use ${entityModulePath}::${moduleName}::{self, Entity as ${entityName}};
+use ${dtoModulePath}::${moduleName}_dto::{${dtoCreateName}, ${dtoUpdateName}};
+use ${voModulePath}::${moduleName}_vo::${voName};
+use anyhow::Context;
+use sea_orm::{ActiveModelTrait, EntityTrait};
+use spring::plugin::service::Service;
+use spring_sea_orm::DbConn;
+use spring_web::error::Result;
+
+#[derive(Clone, Service)]
+pub struct $serviceName {
+    #[inject(component)]
+    db: DbConn,
+}
+
+impl $serviceName {
+    pub async fn find_by_id(&self, id: ${primaryKeyType}) -> Result<Option<${voName}>> {
+        let model = ${entityName}::find_by_id(id)
+            .one(&self.db)
+            .await
+            .context("query by id failed")?;
+        Ok(model.map(${voName}::from))
+    }
+
+    pub async fn find_all(&self) -> Result<Vec<${voName}>> {
+        let models = ${entityName}::find()
+            .all(&self.db)
+            .await
+            .context("query all failed")?;
+        Ok(models.into_iter().map(${voName}::from).collect())
+    }
+
+    pub async fn create(&self, dto: ${dtoCreateName}) -> Result<${voName}> {
+        let model: ${moduleName}::ActiveModel = dto.into();
+        let result = model.insert(&self.db).await.context("create failed")?;
+        Ok(result.into())
+    }
+
+    pub async fn update(&self, id: ${primaryKeyType}, dto: ${dtoUpdateName}) -> Result<${voName}> {
+        let existing = ${entityName}::find_by_id(id)
+            .one(&self.db)
+            .await
+            .context("query failed")?
+            .context("not found")?;
+        let mut model: ${moduleName}::ActiveModel = existing.into();
+        dto.apply_to(&mut model);
+        let result = model.update(&self.db).await.context("update failed")?;
+        Ok(result.into())
+    }
+
+    pub async fn delete_by_id(&self, id: ${primaryKeyType}) -> Result<()> {
+        ${entityName}::delete_by_id(id)
+            .exec(&self.db)
+            .await
+            .context("delete failed")?;
+        Ok(())
+    }
+}

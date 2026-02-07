@@ -22,6 +22,8 @@ import org.rust.lang.core.psi.ext.stringValue
  *   - Router::new().nest("/api", inner_router) (nested routers with prefix)
  *   - Router::new().merge(other_router) (merged routers)
  */
+
+// TODO: Scan routes in dependencies. Skip crates that don't depend on axum or other web frameworks.
 object SpringRsRouteUtil {
 
     data class RouteInfo(
