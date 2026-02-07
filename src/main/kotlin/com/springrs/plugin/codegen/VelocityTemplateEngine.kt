@@ -3,6 +3,8 @@ package com.springrs.plugin.codegen
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.springrs.plugin.codegen.dialect.resolveTimestampNowExpr
+import com.springrs.plugin.codegen.template.TemplateCallback
+import com.springrs.plugin.codegen.template.TemplateTool
 import com.springrs.plugin.utils.SpringRsConstants.TYPE_DATE
 import com.springrs.plugin.utils.SpringRsConstants.TYPE_DATE_TIME
 import com.springrs.plugin.utils.SpringRsConstants.TYPE_DATE_TIME_WITH_TZ
@@ -36,13 +38,43 @@ object VelocityTemplateEngine {
 
     /**
      * Render a Velocity template string with the given context.
+     *
+     * Automatically injects:
+     * - `$tool` — [TemplateTool] (string manipulation, collections, time)
+     * - `$callback` — [TemplateCallback] (file name/path control)
+     *
+     * @return Pair(rendered content, callback state after rendering)
      */
     fun render(templateContent: String, context: Map<String, Any?>): String {
+        val callback = TemplateCallback()
         val vc = VelocityContext()
+
+        // Inject built-in objects
+        vc.put("tool", TemplateTool)
+        vc.put("callback", callback)
+
+        // Inject user context
         context.forEach { (key, value) -> if (value != null) vc.put(key, value) }
+
         val writer = StringWriter()
         engine.evaluate(vc, writer, "spring-rs-codegen", templateContent)
         return writer.toString()
+    }
+
+    /**
+     * Render a template and return both the content and the callback state.
+     * Used by the Action to respect `$callback.setFileName()` etc.
+     */
+    fun renderWithCallback(templateContent: String, context: Map<String, Any?>): Pair<String, TemplateCallback> {
+        val callback = TemplateCallback()
+        val vc = VelocityContext()
+        vc.put("tool", TemplateTool)
+        vc.put("callback", callback)
+        context.forEach { (key, value) -> if (value != null) vc.put(key, value) }
+
+        val writer = StringWriter()
+        engine.evaluate(vc, writer, "spring-rs-codegen", templateContent)
+        return writer.toString() to callback
     }
 
     /**
@@ -98,6 +130,11 @@ object VelocityTemplateEngine {
         val timestampNowExpr = resolveTimestampNowExpr((createdAtField ?: updatedAtField)?.rustType)
 
         return mutableMapOf(
+            // ── Global info ──
+            "author" to System.getProperty("user.name", ""),
+            "date" to TemplateTool.currDate(),
+            "year" to TemplateTool.currYear(),
+
             // ── Table names ──
             "tableName" to table.name,
             "tableComment" to (table.comment ?: ""),

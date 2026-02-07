@@ -96,15 +96,19 @@ class GenerateSeaOrmAction : AnAction() {
                     updateCrateRoot(basePath, generatedOutputDirs)
                 }
 
+                // Format generated files with rustfmt
+                val formattedCount = RustFormatter.formatFiles(allFiles)
+
                 // Refresh VFS
                 val refreshRoot = File(basePath, "src")
                 LocalFileSystem.getInstance().refreshAndFindFileByIoFile(refreshRoot)?.let {
                     VfsUtil.markDirtyAndRefresh(false, true, true, it)
                 }
 
+                val fmtSuffix = if (formattedCount > 0) " (${formattedCount} formatted)" else ""
                 notify(project,
                     SpringRsBundle.message("codegen.notify.success.full",
-                        tableInfos.size, generatedOutputDirs.size, allFiles.size),
+                        tableInfos.size, generatedOutputDirs.size, allFiles.size) + fmtSuffix,
                     NotificationType.INFORMATION)
 
                 allFiles.firstOrNull()?.let { openFile(project, it) }

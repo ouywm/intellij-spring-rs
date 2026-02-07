@@ -4,6 +4,14 @@
         <!-- Code generation settings (project-level service) -->
         <projectService
             serviceImplementation="com.springrs.plugin.codegen.CodeGenSettingsState"/>
+
+        <!-- Settings page: Settings → Tools → Sea-ORM Code Generation -->
+        <projectConfigurable
+            parentId="tools"
+            instance="com.springrs.plugin.codegen.settings.CodeGenSettingsConfigurable"
+            id="SpringRs.CodeGenSettings"
+            displayName="Sea-ORM Code Generation"
+            nonDefaultProject="true"/>
     </extensions>
 
     <!-- Actions for Database view -->
