@@ -232,6 +232,12 @@
         <internalFileTemplate name="grpc-server.rs"/>
         <internalFileTemplate name="grpc-helloworld.proto"/>
 
+        <!-- Settings: top-level "spring-rs" group -->
+        <applicationConfigurable
+            id="SpringRs.Settings"
+            displayName="spring-rs"
+            instance="com.springrs.plugin.codegen.settings.SpringRsSettingsGroup"/>
+
     </extensions>
 
     <!-- Actions -->

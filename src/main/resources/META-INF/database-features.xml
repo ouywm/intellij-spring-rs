@@ -5,12 +5,12 @@
         <projectService
             serviceImplementation="com.springrs.plugin.codegen.CodeGenSettingsState"/>
 
-        <!-- Settings page: Settings → Tools → Sea-ORM Code Generation -->
+        <!-- Settings page: Settings → spring-rs → Code Generation -->
         <projectConfigurable
-            parentId="tools"
+            parentId="SpringRs.Settings"
             instance="com.springrs.plugin.codegen.settings.CodeGenSettingsConfigurable"
             id="SpringRs.CodeGenSettings"
-            displayName="Sea-ORM Code Generation"
+            displayName="Code Generation"
             nonDefaultProject="true"/>
     </extensions>
 
