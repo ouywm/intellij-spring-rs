@@ -1,0 +1,104 @@
+name: Build Plugin
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build (platform ${{ matrix.platform }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ 251, 241 ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(grep -oP 'pluginVersion=\K.*' gradle.properties)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Plugin version: $VERSION"
+
+      - name: Build plugin
+        run: ./gradlew -PplatformVersion=${{ matrix.platform }} buildPlugin
+
+      - name: Run tests
+        run: ./gradlew -PplatformVersion=${{ matrix.platform }} test
+
+      - name: Verify plugin artifact
+        run: |
+          echo "Built artifacts:"
+          ls -lh build/distributions/*.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: spring-rs-${{ steps.version.outputs.version }}-${{ matrix.platform }}
+          path: build/distributions/*.zip
+
+  release:
+    name: Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List release files
+        run: |
+          echo "Release artifacts:"
+          find artifacts -name "*.zip" -exec ls -lh {} \;
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Spring Rs v${{ steps.version.outputs.version }}
+          files: artifacts/**/*.zip
+          generate_release_notes: true
+          body: |
+            ## Spring Rs Plugin v${{ steps.version.outputs.version }}
+
+            ### Installation
+
+            Download the `.zip` file matching your IDE version and install via:
+            **Settings → Plugins → ⚙️ → Install Plugin from Disk...**
+
+            | File | IDE |
+            |------|-----|
+            | `*-251.zip` | RustRover 2025.1+ |
+            | `*-241.zip` | RustRover 2024.1 |
+
+            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
