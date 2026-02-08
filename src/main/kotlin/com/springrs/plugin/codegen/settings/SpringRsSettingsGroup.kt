@@ -30,9 +30,28 @@ class SpringRsSettingsGroup : SearchableConfigurable, Configurable.Composite {
             add(JBLabel("spring-rs Plugin Settings").apply {
                 font = font.deriveFont(Font.BOLD, 16f)
             }, BorderLayout.NORTH)
-            add(JBLabel(SpringRsBundle.message("codegen.settings.group.description")).apply {
-                border = JBUI.Borders.emptyTop(10)
-            }, BorderLayout.CENTER)
+
+            val content = JPanel().apply {
+                layout = javax.swing.BoxLayout(this, javax.swing.BoxLayout.Y_AXIS)
+                border = JBUI.Borders.emptyTop(16)
+
+                add(JBLabel(SpringRsBundle.message("codegen.settings.group.description")).apply {
+                    border = JBUI.Borders.emptyBottom(16)
+                })
+
+                // Sub-pages summary
+                add(JBLabel("<html><b>Code Generation</b> — Velocity templates, template groups, global variables</html>"))
+                add(JBLabel("  ├── General — Database type, output dirs, prefix, formatting"))
+                add(JBLabel("  └── Type Mapping — SQL → Rust type mapping (regex, groups, import/export)"))
+                add(javax.swing.Box.createVerticalStrut(16))
+                add(JBLabel("<html><b>Features:</b></html>"))
+                add(JBLabel("  • TOML config completion, validation & navigation"))
+                add(JBLabel("  • HTTP route management & tool window"))
+                add(JBLabel("  • Service / Inject line markers"))
+                add(JBLabel("  • Sea-ORM code generation from database tables"))
+                add(JBLabel("  • JSON to Rust struct conversion"))
+            }
+            add(content, BorderLayout.CENTER)
         }
     }
 

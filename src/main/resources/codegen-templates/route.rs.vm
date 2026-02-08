@@ -1,33 +1,32 @@
-use ${dtoModulePath}::${moduleName}_dto::{${dtoCreateName}, ${dtoUpdateName}};
-use ${voModulePath}::${moduleName}_vo::${voName};
+#set($base = "${routePrefix}/${tool.toKebabCase($moduleName)}s")
+#if($isCompositePrimaryKey)
+## ── Junction table (composite PK = many-to-many) ──
+## Only list + create + delete. No get-by-id or update.
+use ${dtoModulePath}::${moduleName}_dto::{${dtoCreateName}, ${queryName}};
 use ${serviceModulePath}::${moduleName}_service::${serviceName};
+use spring_sea_orm::pagination::Pagination;
+use spring_web::axum::http::StatusCode;
 use spring_web::axum::response::IntoResponse;
 use spring_web::delete;
 use spring_web::error::Result;
-use spring_web::extractor::{Component, Json, Path};
+use spring_web::extractor::{Component, Json, Query};
 use spring_web::get;
 use spring_web::post;
-use spring_web::put;
 
-#[get("${routePrefix}/${moduleName}s")]
-pub async fn list(
+/// GET ${base}?page=1&size=10&field=value
+#[get("${base}")]
+pub async fn ${moduleName}_page(
     Component(service): Component<${serviceName}>,
+    Query(query): Query<${queryName}>,
+    pagination: Pagination,
 ) -> Result<impl IntoResponse> {
-    let items = service.find_all().await?;
-    Ok(Json(items))
+    let result = service.find_page(query, pagination).await?;
+    Ok(Json(result))
 }
 
-#[get("${routePrefix}/${moduleName}s/{id}")]
-pub async fn get_by_id(
-    Component(service): Component<${serviceName}>,
-    Path(id): Path<${primaryKeyType}>,
-) -> Result<impl IntoResponse> {
-    let item = service.find_by_id(id).await?;
-    Ok(Json(item))
-}
-
-#[post("${routePrefix}/${moduleName}s")]
-pub async fn create(
+/// POST ${base}
+#[post("${base}")]
+pub async fn ${moduleName}_create(
     Component(service): Component<${serviceName}>,
     Json(dto): Json<${dtoCreateName}>,
 ) -> Result<impl IntoResponse> {
@@ -35,8 +34,66 @@ pub async fn create(
     Ok(Json(result))
 }
 
-#[put("${routePrefix}/${moduleName}s/{id}")]
-pub async fn update(
+/// DELETE ${base}
+#[delete("${base}")]
+pub async fn ${moduleName}_delete(
+    Component(service): Component<${serviceName}>,
+    Json(dto): Json<${dtoCreateName}>,
+) -> Result<impl IntoResponse> {
+    service.delete_by_ids(dto).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+#else
+## ── Normal table (single PK) ──
+use ${dtoModulePath}::${moduleName}_dto::{${dtoCreateName}, ${dtoUpdateName}, ${queryName}};
+use ${serviceModulePath}::${moduleName}_service::${serviceName};
+#if($primaryKeyType == "Uuid")
+use sea_orm::prelude::Uuid;
+#end
+use spring_sea_orm::pagination::Pagination;
+use spring_web::axum::http::StatusCode;
+use spring_web::axum::response::IntoResponse;
+use spring_web::delete;
+use spring_web::error::Result;
+use spring_web::extractor::{Component, Json, Path, Query};
+use spring_web::get;
+use spring_web::post;
+use spring_web::put;
+
+/// GET ${base}?page=1&size=10&field=value
+#[get("${base}")]
+pub async fn ${moduleName}_page(
+    Component(service): Component<${serviceName}>,
+    Query(query): Query<${queryName}>,
+    pagination: Pagination,
+) -> Result<impl IntoResponse> {
+    let result = service.find_page(query, pagination).await?;
+    Ok(Json(result))
+}
+
+/// GET ${base}/{id}
+#[get("${base}/{id}")]
+pub async fn ${moduleName}_get_by_id(
+    Component(service): Component<${serviceName}>,
+    Path(id): Path<${primaryKeyType}>,
+) -> Result<impl IntoResponse> {
+    let item = service.find_by_id(id).await?;
+    Ok(Json(item))
+}
+
+/// POST ${base}
+#[post("${base}")]
+pub async fn ${moduleName}_create(
+    Component(service): Component<${serviceName}>,
+    Json(dto): Json<${dtoCreateName}>,
+) -> Result<impl IntoResponse> {
+    let result = service.create(dto).await?;
+    Ok(Json(result))
+}
+
+/// PUT ${base}/{id}
+#[put("${base}/{id}")]
+pub async fn ${moduleName}_update(
     Component(service): Component<${serviceName}>,
     Path(id): Path<${primaryKeyType}>,
     Json(dto): Json<${dtoUpdateName}>,
@@ -45,11 +102,13 @@ pub async fn update(
     Ok(Json(result))
 }
 
-#[delete("${routePrefix}/${moduleName}s/{id}")]
-pub async fn delete(
+/// DELETE ${base}/{id}
+#[delete("${base}/{id}")]
+pub async fn ${moduleName}_delete(
     Component(service): Component<${serviceName}>,
     Path(id): Path<${primaryKeyType}>,
 ) -> Result<impl IntoResponse> {
     service.delete_by_id(id).await?;
-    Ok(Json("deleted"))
+    Ok(StatusCode::NO_CONTENT)
 }
+#end

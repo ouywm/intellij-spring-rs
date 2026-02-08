@@ -1,11 +1,21 @@
 use serde::Serialize;
 use ${entityModulePath}::${moduleName};
+#if($addBon)
+use bon::Builder;
+#end
+#if($addJsonSchema)
+use schemars::JsonSchema;
+#end
 #if($tableComment != "")
 
-/// ${tableComment} Response
+/// ${tableComment} — API response view object.
+///
+/// DateTime/Uuid/Decimal fields are converted to `String` for JSON serialization & JsonSchema compatibility.
 #else
 
-/// ${entityName} Response
+/// View object for `${tableName}` — used in API responses.
+///
+/// DateTime/Uuid/Decimal fields are converted to `String` for JSON serialization & JsonSchema compatibility.
 #end
 #[derive(${voBaseDerives}#if($extraDerives != ""), ${extraDerives}#end)]
 pub struct $voName {
@@ -17,17 +27,24 @@ pub struct $voName {
 #end
 }
 
-/// Convert Entity Model → VO (DateTime fields are converted to String)
+/// Convert Entity `Model` → `${voName}` for API responses.
+///
+/// Type conversions:
+/// - `DateTime`/`DateTimeWithTimeZone` → `String` (ISO 8601 format)
+/// - `Uuid` → `String` (hyphenated format)
+/// - `Decimal` → `String` (preserves precision)
+/// - `Json` → `String` (JSON string)
 impl From<${moduleName}::Model> for $voName {
     fn from(model: ${moduleName}::Model) -> Self {
         Self {
 #foreach($column in $columns)
-#if($column.isDateTimeType && $column.isNullable)
-            $column.fieldName: model.$column.fieldName.map(|v| v.to_string()),
-#elseif($column.isDateTimeType)
-            $column.fieldName: model.$column.fieldName.to_string(),
+#if($column.isVoConvertType && $column.isNullable)
+## Velocity needs #[[ ]]# to escape Rust closure |v| syntax
+            $column.fieldName: model.${column.fieldName}.map(#[[|v| v.to_string()]]#),
+#elseif($column.isVoConvertType)
+            $column.fieldName: model.${column.fieldName}.to_string(),
 #else
-            $column.fieldName: model.$column.fieldName,
+            $column.fieldName: model.${column.fieldName},
 #end
 #end
         }

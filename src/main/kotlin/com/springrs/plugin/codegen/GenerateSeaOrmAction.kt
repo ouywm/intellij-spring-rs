@@ -16,6 +16,11 @@ import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
 import com.springrs.plugin.SpringRsBundle
 import com.springrs.plugin.codegen.dialect.DatabaseDialect
+import com.springrs.plugin.codegen.layer.DtoLayer
+import com.springrs.plugin.codegen.layer.EntityLayer
+import com.springrs.plugin.codegen.layer.RouteLayer
+import com.springrs.plugin.codegen.layer.ServiceLayer
+import com.springrs.plugin.codegen.layer.VoLayer
 import java.io.File
 
 /**
@@ -40,6 +45,9 @@ class GenerateSeaOrmAction : AnAction() {
             ?.filterIsInstance<DbTable>()
             ?.takeIf { it.isNotEmpty() } ?: return
 
+        // Reset per-invocation state
+        globalConflictResolution = null
+
         // Auto-detect database dialect + read settings
         val dialect = DatabaseDialect.detect(dbTables.first())
         val settings = CodeGenSettingsState.getInstance(project)
@@ -54,17 +62,46 @@ class GenerateSeaOrmAction : AnAction() {
 
         val basePath = project.basePath ?: return
 
+        // Re-read tables with updated prefix (user may have changed it in the dialog)
+        val updatedTableInfos = dbTables.map {
+            TableMetadataReader.readTable(it, dialect, settings.tableNamePrefix, settings.columnNamePrefix)
+        }
+
         // Apply per-table overrides (exclude columns, type overrides)
-        val effectiveTableInfos = tableInfos.map { table ->
+        val effectiveTableInfos = updatedTableInfos.map { table ->
             val override = settings.tableOverrides[table.name]
             table.applyOverride(override)
         }
 
         // Detect foreign key relations between selected tables
-        val relationsMap = RelationDetector.detectRelations(dbTables)
+        val detectedRelations = RelationDetector.detectRelations(dbTables)
+
+        // Collect user-defined custom relations (FK definitions → BELONGS_TO)
+        // and auto-generate reverse relations (HAS_MANY)
+        val customRelationsMap = mutableMapOf<String, MutableList<RelationInfo>>()
+        val selectedTableNames = effectiveTableInfos.map { it.name.lowercase() }.toSet()
+        for (table in effectiveTableInfos) {
+            val override = settings.tableOverrides[table.name]
+            val customRels = override?.customRelations?.map { it.toRelationInfo() } ?: emptyList()
+            if (customRels.isNotEmpty()) {
+                customRelationsMap.getOrPut(table.name.lowercase()) { mutableListOf() }.addAll(customRels)
+                // Auto-generate reverse relations for BELONGS_TO FKs
+                for (rel in customRels) {
+                    if (rel.relationType == RelationType.BELONGS_TO && rel.targetTable.lowercase() in selectedTableNames) {
+                        customRelationsMap.getOrPut(rel.targetTable.lowercase()) { mutableListOf() }
+                            .add(RelationInfo(RelationType.HAS_MANY, table.name, rel.toColumn, rel.fromColumn))
+                    }
+                }
+            }
+        }
+
+        // Merge: custom + auto-detected (custom wins on dedup)
+        val relationsMap = RelationDetector.mergeRelations(detectedRelations, customRelationsMap)
 
         // Check if user generated from Preview (with possibly edited content)
         val previewFiles = dialog.previewEditedFiles
+
+        var firstGeneratedFile: File? = null
 
         ApplicationManager.getApplication().runWriteAction {
             try {
@@ -72,46 +109,46 @@ class GenerateSeaOrmAction : AnAction() {
                 val generatedOutputDirs: List<String>
 
                 if (previewFiles != null) {
-                    // ── Write preview-edited files directly ──
                     val result = writePreviewFiles(basePath, previewFiles)
                     allFiles = result.first
                     generatedOutputDirs = result.second
                 } else {
-                    // ── Normal generation via templates ──
-                    val layers = buildLayerSpecs(dialog, project, relationsMap)
-                    val mutableFiles = mutableListOf<File>()
-                    val mutableDirs = mutableListOf<String>()
-                    for (layer in layers) {
-                        if (!layer.enabled) continue
-                        val (files, _) = generateLayer(basePath, layer, effectiveTableInfos, project)
-                        mutableFiles.addAll(files)
-                        mutableDirs.add(layer.outputDir)
+                    // Build layer configs
+                    val layerConfigs = buildLayerConfigs(dialog, project, relationsMap)
+                    generatedOutputDirs = layerConfigs.filter { it.enabled }.map { it.outputDir }
+
+                    // Plan + Execute — unified path
+                    val plan = CodegenPlan.plan(layerConfigs, effectiveTableInfos, project)
+                    allFiles = CodegenExecutor.writeFiles(basePath, plan, layerConfigs) { path ->
+                        resolveConflict(project, path)
                     }
-                    allFiles = mutableFiles
-                    generatedOutputDirs = mutableDirs
                 }
 
-                // Update crate root (main.rs / lib.rs) with mod declarations
                 if (generatedOutputDirs.isNotEmpty()) {
                     updateCrateRoot(basePath, generatedOutputDirs)
                 }
 
-                // Format generated files with rustfmt
                 val formattedCount = RustFormatter.formatFiles(allFiles)
 
-                // Refresh VFS
                 val refreshRoot = File(basePath, "src")
                 LocalFileSystem.getInstance().refreshAndFindFileByIoFile(refreshRoot)?.let {
                     VfsUtil.markDirtyAndRefresh(false, true, true, it)
                 }
 
+                val allDerives = mutableSetOf<String>()
+                allDerives.addAll(dialog.entityExtraDerives)
+                allDerives.addAll(dialog.dtoExtraDerives)
+                allDerives.addAll(dialog.voExtraDerives)
+                val addedCrates = CargoDependencyManager.ensureDependencies(project, allDerives, effectiveTableInfos)
+
                 val fmtSuffix = if (formattedCount > 0) " (${formattedCount} formatted)" else ""
+                val depSuffix = if (addedCrates.isNotEmpty()) "\nAdded to Cargo.toml: ${addedCrates.joinToString(", ")}" else ""
                 notify(project,
                     SpringRsBundle.message("codegen.notify.success.full",
-                        tableInfos.size, generatedOutputDirs.size, allFiles.size) + fmtSuffix,
+                        tableInfos.size, generatedOutputDirs.size, allFiles.size) + fmtSuffix + depSuffix,
                     NotificationType.INFORMATION)
 
-                allFiles.firstOrNull()?.let { openFile(project, it) }
+                firstGeneratedFile = allFiles.firstOrNull()
             } catch (ex: Exception) {
                 LOG.error("Code generation failed", ex)
                 notify(project,
@@ -119,6 +156,50 @@ class GenerateSeaOrmAction : AnAction() {
                     NotificationType.ERROR)
             }
         }
+
+        // Open file OUTSIDE runWriteAction (needs read access, not write)
+        firstGeneratedFile?.let { openFile(project, it) }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // ── Layer config construction
+    // ══════════════════════════════════════════════════════════════
+
+    private fun buildLayerConfigs(
+        dialog: GenerateSeaOrmDialog, project: Project,
+        relationsMap: Map<String, List<RelationInfo>> = emptyMap()
+    ): List<LayerConfig> {
+        val settings = CodeGenSettingsState.getInstance(project)
+        return listOf(
+            LayerConfig(
+                EntityLayer(dialog.entityExtraDerives, relationsMap, dialog.entityDerivesOverrides),
+                dialog.isEntityEnabled, dialog.entityOutputDir,
+                isTableEnabled = { settings.tableOverrides[it]?.generateEntity ?: true },
+                outputDirForTable = dialog.entityOutputDirForTable
+            ),
+            LayerConfig(
+                DtoLayer(dialog.dtoExtraDerives, dialog.dtoDerivesOverrides),
+                dialog.isDtoEnabled, dialog.dtoOutputDir,
+                isTableEnabled = { settings.tableOverrides[it]?.generateDto ?: true },
+                outputDirForTable = dialog.dtoOutputDirForTable
+            ),
+            LayerConfig(
+                VoLayer(dialog.voExtraDerives, dialog.voDerivesOverrides),
+                dialog.isVoEnabled, dialog.voOutputDir,
+                isTableEnabled = { settings.tableOverrides[it]?.generateVo ?: true },
+                outputDirForTable = dialog.voOutputDirForTable
+            ),
+            LayerConfig(
+                ServiceLayer(), dialog.isServiceEnabled, dialog.serviceOutputDir,
+                isTableEnabled = { settings.tableOverrides[it]?.generateService ?: true },
+                outputDirForTable = dialog.serviceOutputDirForTable
+            ),
+            LayerConfig(
+                RouteLayer(), dialog.isRouteEnabled, dialog.routeOutputDir,
+                isTableEnabled = { settings.tableOverrides[it]?.generateRoute ?: true },
+                outputDirForTable = dialog.routeOutputDirForTable
+            )
+        )
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -140,102 +221,24 @@ class GenerateSeaOrmAction : AnAction() {
             file.parentFile?.mkdirs()
             file.writeText(gf.content)
             writtenFiles.add(file)
-            // Extract output dir: "src/entity/users.rs" → "src/entity"
             val parentRelative = gf.relativePath.substringBeforeLast("/", "")
-            if (parentRelative.isNotEmpty()) outputDirs.add(parentRelative)
+            if (parentRelative.isNotEmpty()) {
+                outputDirs.add(parentRelative)
+            }
         }
+
+        // mod.rs and prelude.rs are already included in previewFiles
+        // (generated by CodegenPlan.plan), so no extra merge needed.
 
         return writtenFiles to outputDirs.toList()
     }
 
     // ══════════════════════════════════════════════════════════════
-    // ── Layer abstraction
+    // ── Conflict resolution
     // ══════════════════════════════════════════════════════════════
-
-    private data class LayerSpec(
-        val enabled: Boolean,
-        val outputDir: String,
-        val generate: (TableInfo) -> String,
-        val fileName: (TableInfo) -> String,
-        val modName: (TableInfo) -> String,
-        /** Whether this is the Entity layer (uses marker-based incremental merge). */
-        val isEntityLayer: Boolean = false,
-        val postProcess: ((File, List<TableInfo>) -> Unit)? = null
-    )
-
-    private fun buildLayerSpecs(
-        dialog: GenerateSeaOrmDialog, project: Project,
-        relationsMap: Map<String, List<RelationInfo>> = emptyMap()
-    ): List<LayerSpec> = listOf(
-        LayerSpec(
-            dialog.isEntityEnabled, dialog.entityOutputDir,
-            { SeaOrmEntityGenerator.generate(it, dialog.entityExtraDerives, project, relationsMap[it.name.lowercase()].orEmpty()) },
-            SeaOrmEntityGenerator::fileName, SeaOrmEntityGenerator::modName,
-            isEntityLayer = true,
-            postProcess = { dir, tables ->
-                updatePreludeFile(dir, tables)
-                updateModFile(dir, listOf("prelude")) // Ensure prelude is declared in mod.rs
-            }
-        ),
-        LayerSpec(dialog.isDtoEnabled, dialog.dtoOutputDir,
-            { DtoGenerator.generate(it, dialog.dtoExtraDerives, project) },
-            DtoGenerator::fileName, DtoGenerator::modName),
-        LayerSpec(dialog.isVoEnabled, dialog.voOutputDir,
-            { VoGenerator.generate(it, dialog.voExtraDerives, project) },
-            VoGenerator::fileName, VoGenerator::modName),
-        LayerSpec(dialog.isServiceEnabled, dialog.serviceOutputDir,
-            { ServiceGenerator.generate(it, project) },
-            ServiceGenerator::fileName, ServiceGenerator::modName),
-        LayerSpec(dialog.isRouteEnabled, dialog.routeOutputDir,
-            { RouteGenerator.generate(it, project) },
-            RouteGenerator::fileName, RouteGenerator::modName)
-    )
 
     /** Shared conflict resolution when "Apply to all" is checked. */
     private var globalConflictResolution: ConflictResolution? = null
-
-    private fun generateLayer(
-        basePath: String, layer: LayerSpec, tables: List<TableInfo>, project: Project
-    ): Pair<List<File>, File> {
-        val dir = File(basePath, layer.outputDir).also { it.mkdirs() }
-        val files = mutableListOf<File>()
-        val modules = mutableListOf<String>()
-
-        for (table in tables) {
-            val file = File(dir, layer.fileName(table))
-            val content = layer.generate(table)
-
-            if (file.exists()) {
-                // ── Entity: try incremental merge (marker-based) ──
-                if (layer.isEntityLayer && IncrementalMerger.writeWithMerge(file, content, true)) {
-                    files.add(file)
-                    modules.add(layer.modName(table))
-                    continue
-                }
-
-                // ── Other layers: file conflict dialog ──
-                val resolution = resolveConflict(project, file.path)
-                when (resolution) {
-                    ConflictResolution.SKIP -> {
-                        modules.add(layer.modName(table))
-                        continue
-                    }
-                    ConflictResolution.BACKUP -> {
-                        file.copyTo(File(file.path + ".bak"), overwrite = true)
-                    }
-                    ConflictResolution.OVERWRITE -> { /* fall through to write */ }
-                }
-            }
-
-            file.writeText(content)
-            files.add(file)
-            modules.add(layer.modName(table))
-        }
-
-        updateModFile(dir, modules)
-        layer.postProcess?.invoke(dir, tables)
-        return files to dir
-    }
 
     /**
      * Resolve file conflict: use global resolution if set, otherwise show dialog.
@@ -286,7 +289,7 @@ class GenerateSeaOrmAction : AnAction() {
                 var currentDir = srcDir
                 for (i in 0 until segments.size - 1) {
                     currentDir = File(currentDir, segments[i]).also { it.mkdirs() }
-                    updateModFile(currentDir, listOf(segments[i + 1]))
+                    updateIntermediateModFile(currentDir, listOf(segments[i + 1]))
                 }
             }
         }
@@ -302,6 +305,19 @@ class GenerateSeaOrmAction : AnAction() {
     private fun findCrateRootFile(srcDir: File): File? {
         return File(srcDir, "lib.rs").takeIf { it.exists() }
             ?: File(srcDir, "main.rs").takeIf { it.exists() }
+    }
+
+    /**
+     * Update intermediate mod.rs for crate root path resolution.
+     * Uses [ModuleFileGenerator] for consistent mod.rs handling.
+     */
+    private fun updateIntermediateModFile(dir: File, newModules: List<String>) {
+        val modFile = File(dir, "mod.rs")
+        if (modFile.exists()) {
+            modFile.writeText(ModuleFileGenerator.mergeModContent(modFile.readText(), newModules))
+        } else {
+            modFile.writeText(ModuleFileGenerator.generateModContent(newModules))
+        }
     }
 
     /**
@@ -412,38 +428,6 @@ class GenerateSeaOrmAction : AnAction() {
         return i
     }
 
-    // ══════════════════════════════════════════════════════════════
-    // ── mod.rs / prelude.rs helpers
-    // ══════════════════════════════════════════════════════════════
-
-    private fun updateModFile(dir: File, newModules: List<String>) {
-        val modFile = File(dir, "mod.rs")
-        val existingContent = if (modFile.exists()) modFile.readText() else ""
-        val existingModules = MOD_REGEX.findAll(existingContent)
-            .map { it.groupValues[1] }
-            .toMutableSet()
-        existingModules.addAll(newModules)
-        modFile.writeText(existingModules.sorted().joinToString("\n") { "pub mod $it;" } + "\n")
-    }
-
-    private fun updatePreludeFile(dir: File, tables: List<TableInfo>) {
-        val preludeFile = File(dir, "prelude.rs")
-        val existing = if (preludeFile.exists()) {
-            PRELUDE_REGEX.findAll(preludeFile.readText())
-                .associate { it.groupValues[1] to it.groupValues[2] }
-                .toMutableMap()
-        } else mutableMapOf()
-
-        for (table in tables) {
-            existing[table.moduleName] = table.entityName
-        }
-
-        preludeFile.writeText(
-            existing.entries.sortedBy { it.key }
-                .joinToString("\n") { "pub use super::${it.key}::Entity as ${it.value};" } + "\n"
-        )
-    }
-
     // ── Utilities ──
 
     private fun openFile(project: Project, file: File) {
@@ -462,12 +446,6 @@ class GenerateSeaOrmAction : AnAction() {
 
     companion object {
         private val LOG = logger<GenerateSeaOrmAction>()
-
-        /** Matches `pub mod xxx;` in mod.rs files */
-        private val MOD_REGEX = Regex("""pub\s+mod\s+(\w+)\s*;""")
-
-        /** Matches `pub use super::xxx::Entity as Xxx;` in prelude.rs */
-        private val PRELUDE_REGEX = Regex("""pub\s+use\s+super::(\w+)::Entity\s+as\s+(\w+)\s*;""")
 
         /** Matches both `mod xxx;` and `pub mod xxx;` in crate root files */
         private val CRATE_MOD_REGEX = Regex("""(?:pub\s+)?mod\s+(\w+)\s*;""")

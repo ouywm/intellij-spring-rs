@@ -1,12 +1,24 @@
 use ${entityModulePath}::${moduleName}::{self, Entity as ${entityName}};
-use ${dtoModulePath}::${moduleName}_dto::{${dtoCreateName}, ${dtoUpdateName}};
+#if($isCompositePrimaryKey)
+use ${dtoModulePath}::${moduleName}_dto::{${dtoCreateName}, ${queryName}};
+#else
+use ${dtoModulePath}::${moduleName}_dto::{${dtoCreateName}, ${dtoUpdateName}, ${queryName}};
+#end
 use ${voModulePath}::${moduleName}_vo::${voName};
 use anyhow::Context;
-use sea_orm::{ActiveModelTrait, EntityTrait};
+use sea_orm::{ActiveModelTrait, EntityTrait, QueryFilter, QueryOrder};
+#if($primaryKeyType == "Uuid" && !$isCompositePrimaryKey)
+use sea_orm::prelude::Uuid;
+#end
 use spring::plugin::service::Service;
 use spring_sea_orm::DbConn;
+use spring_sea_orm::pagination::{Page, Pagination, PaginationExt};
 use spring_web::error::Result;
 
+/// Service layer for `${tableName}` CRUD operations.
+///
+/// Uses spring-rs `#[derive(Service)]` for dependency injection.
+/// DbConn is auto-injected via `#[inject(component)]`.
 #[derive(Clone, Service)]
 pub struct $serviceName {
     #[inject(component)]
@@ -14,45 +26,74 @@ pub struct $serviceName {
 }
 
 impl $serviceName {
-    pub async fn find_by_id(&self, id: ${primaryKeyType}) -> Result<Option<${voName}>> {
-        let model = ${entityName}::find_by_id(id)
+#if(!$isCompositePrimaryKey)
+    /// Find a single record by primary key.
+    pub async fn find_by_id(&self, pk: ${primaryKeyType}) -> Result<Option<${voName}>> {
+        let model = ${entityName}::find_by_id(pk)
             .one(&self.db)
             .await
-            .context("query by id failed")?;
+            .context("failed to query ${moduleName} by id")?;
         Ok(model.map(${voName}::from))
     }
 
-    pub async fn find_all(&self) -> Result<Vec<${voName}>> {
-        let models = ${entityName}::find()
-            .all(&self.db)
+#end
+    /// Find paginated records with optional query filter.
+    ///
+    /// Uses spring-sea-orm `PaginationExt` for automatic page/size extraction.
+    pub async fn find_page(&self, query: ${queryName}, pagination: Pagination) -> Result<Page<${voName}>> {
+        let page = ${entityName}::find()
+            .filter(query)
+            .order_by_desc(${moduleName}::Column::${tool.toPascalCase($primaryKeyName)})
+            .page(&self.db, &pagination)
             .await
-            .context("query all failed")?;
-        Ok(models.into_iter().map(${voName}::from).collect())
+            .context("failed to query ${moduleName} page")?;
+        Ok(page.map(${voName}::from))
     }
 
+    /// Create a new record.
     pub async fn create(&self, dto: ${dtoCreateName}) -> Result<${voName}> {
-        let model: ${moduleName}::ActiveModel = dto.into();
-        let result = model.insert(&self.db).await.context("create failed")?;
+        let active_model: ${moduleName}::ActiveModel = dto.into();
+        let result = active_model
+            .insert(&self.db)
+            .await
+            .context("failed to create ${moduleName}")?;
         Ok(result.into())
     }
 
-    pub async fn update(&self, id: ${primaryKeyType}, dto: ${dtoUpdateName}) -> Result<${voName}> {
-        let existing = ${entityName}::find_by_id(id)
-            .one(&self.db)
+#if($isCompositePrimaryKey)
+    /// Delete a junction record by its composite key fields.
+    pub async fn delete_by_ids(&self, dto: ${dtoCreateName}) -> Result<()> {
+        let active_model: ${moduleName}::ActiveModel = dto.into();
+        active_model
+            .delete(&self.db)
             .await
-            .context("query failed")?
-            .context("not found")?;
-        let mut model: ${moduleName}::ActiveModel = existing.into();
-        dto.apply_to(&mut model);
-        let result = model.update(&self.db).await.context("update failed")?;
-        Ok(result.into())
-    }
-
-    pub async fn delete_by_id(&self, id: ${primaryKeyType}) -> Result<()> {
-        ${entityName}::delete_by_id(id)
-            .exec(&self.db)
-            .await
-            .context("delete failed")?;
+            .context("failed to delete ${moduleName}")?;
         Ok(())
     }
+#else
+    /// Update an existing record.
+    pub async fn update(&self, pk: ${primaryKeyType}, dto: ${dtoUpdateName}) -> Result<${voName}> {
+        ${entityName}::find_by_id(pk)
+            .one(&self.db)
+            .await
+            .context("failed to query ${moduleName} for update")?
+            .context("${moduleName} not found")?;
+        let mut active_model: ${moduleName}::ActiveModel = dto.into();
+        active_model.${primaryKeyName} = sea_orm::Unchanged(pk);
+        let result = active_model
+            .update(&self.db)
+            .await
+            .context("failed to update ${moduleName}")?;
+        Ok(result.into())
+    }
+
+    /// Delete a record by primary key.
+    pub async fn delete_by_id(&self, pk: ${primaryKeyType}) -> Result<()> {
+        ${entityName}::delete_by_id(pk)
+            .exec(&self.db)
+            .await
+            .context("failed to delete ${moduleName}")?;
+        Ok(())
+    }
+#end
 }

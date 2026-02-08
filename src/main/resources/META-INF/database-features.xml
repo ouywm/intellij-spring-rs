@@ -5,13 +5,28 @@
         <projectService
             serviceImplementation="com.springrs.plugin.codegen.CodeGenSettingsState"/>
 
-        <!-- Settings page: Settings → spring-rs → Code Generation -->
+        <!-- Settings pages (temporarily disabled, parent SpringRs.Settings is disabled)
         <projectConfigurable
             parentId="SpringRs.Settings"
             instance="com.springrs.plugin.codegen.settings.CodeGenSettingsConfigurable"
             id="SpringRs.CodeGenSettings"
             displayName="Code Generation"
             nonDefaultProject="true"/>
+
+        <projectConfigurable
+            parentId="SpringRs.CodeGenSettings"
+            instance="com.springrs.plugin.codegen.settings.CodeGenGeneralConfigurable"
+            id="SpringRs.CodeGenGeneralSettings"
+            displayName="General"
+            nonDefaultProject="true"/>
+
+        <projectConfigurable
+            parentId="SpringRs.CodeGenSettings"
+            instance="com.springrs.plugin.codegen.settings.TypeMapperConfigurable"
+            id="SpringRs.TypeMapperSettings"
+            displayName="Type Mapping"
+            nonDefaultProject="true"/>
+        -->
     </extensions>
 
     <!-- Actions for Database view -->
@@ -21,7 +36,7 @@
                 text="Generate Sea-ORM Code"
                 description="Generate sea-orm entity from database tables"
                 icon="/icons/spring-rs.svg">
-            <add-to-group group-id="DatabaseViewPopupMenu" anchor="last"/>
+            <add-to-group group-id="DatabaseViewPopupMenu" anchor="first"/>
         </action>
 
         <action id="SpringRs.InitTemplates"

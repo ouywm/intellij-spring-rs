@@ -47,9 +47,8 @@ interface DatabaseDialect {
         fun detect(table: DasTable): DatabaseDialect = forType(detectType(table))
 
         private fun detectType(table: DasTable): DatabaseType {
-            @Suppress("DEPRECATION")
             val allTypes = DasUtil.getColumns(table)
-                .map { it.dataType.typeName.lowercase() }
+                .map { it.dasType.typeClass.name.lowercase() }
                 .toSet()
 
             return when {
@@ -140,7 +139,7 @@ fun resolveFromMap(sqlType: String, typeMap: Map<String, String>): String {
  * Database-agnostic: only depends on the column's Rust type (already correctly set by dialect).
  */
 fun resolveTimestampNowExpr(rustType: String?): String = when (rustType) {
-    TYPE_DATE_TIME -> "chrono::Utc::now().naive_utc()"
-    TYPE_DATE_TIME_WITH_TZ -> "chrono::Utc::now().fixed_offset()"
-    else -> "chrono::Utc::now().fixed_offset()"
+    TYPE_DATE_TIME -> "Utc::now().naive_utc()"
+    TYPE_DATE_TIME_WITH_TZ -> "Utc::now().fixed_offset()"
+    else -> "Utc::now().fixed_offset()"
 }

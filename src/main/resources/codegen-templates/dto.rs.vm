@@ -1,15 +1,30 @@
-use sea_orm::Set;
-use serde::Deserialize;
+#if(!$queryColumns.isEmpty())
 use ${entityModulePath}::${moduleName};
+#end
+use ${entityModulePath}::${moduleName}::ActiveModel;
+use sea_orm::prelude::*;
+use sea_orm::sea_query::IntoCondition;
+#if(!$queryColumns.isEmpty())
+use sea_orm::{ColumnTrait, Condition, Set};
+#else
+use sea_orm::{Condition, Set};
+#end
+use serde::Deserialize;
+#if($addBon)
+use bon::Builder;
+#end
 #if($addValidate)
 use validator::Validate;
+#end
+#if($needsDecimal)
+use rust_decimal::Decimal;
 #end
 #if($tableComment != "")
 
 /// Create ${tableComment}
 #else
 
-/// Create ${entityName}
+/// Create DTO for `${tableName}`
 #end
 #[derive(${dtoBaseDerives}#if($extraDerives != ""), ${extraDerives}#end)]
 pub struct $dtoCreateName {
@@ -21,8 +36,7 @@ pub struct $dtoCreateName {
 #end
 }
 
-/// Convert CreateDto → ActiveModel for insert
-impl From<$dtoCreateName> for ${moduleName}::ActiveModel {
+impl From<$dtoCreateName> for ActiveModel {
     fn from(dto: $dtoCreateName) -> Self {
         Self {
 #foreach($column in $insertColumns)
@@ -37,7 +51,7 @@ impl From<$dtoCreateName> for ${moduleName}::ActiveModel {
 /// Update ${tableComment}
 #else
 
-/// Update ${entityName}
+/// Update DTO for `${tableName}`
 #end
 #[derive(${dtoBaseDerives}#if($extraDerives != ""), ${extraDerives}#end)]
 pub struct $dtoUpdateName {
@@ -45,19 +59,61 @@ pub struct $dtoUpdateName {
 #if($column.comment != "")
     /// $column.comment
 #end
+    pub $column.fieldName: $column.fullRustType,
+#end
+}
+
+impl From<$dtoUpdateName> for ActiveModel {
+    fn from(dto: $dtoUpdateName) -> Self {
+        Self {
+#foreach($column in $updateColumns)
+            $column.fieldName: Set(dto.$column.fieldName),
+#end
+            ..Default::default()
+        }
+    }
+}
+#if($tableComment != "")
+
+/// Query ${tableComment}
+#else
+
+/// Query DTO for `${tableName}` — used as filter in page/list endpoints
+#end
+#[derive(Debug, Deserialize)]
+pub struct $queryName {
+#foreach($column in $queryColumns)
+#if($column.comment != "")
+    /// $column.comment
+#end
     pub $column.fieldName: Option<$column.rustType>,
 #end
 }
 
-/// Apply UpdateDto fields to an existing ActiveModel (partial update)
-impl $dtoUpdateName {
-    pub fn apply_to(self, model: &mut ${moduleName}::ActiveModel) {
-#foreach($column in $updateColumns)
-#if($column.isEntityNullable)
-        if let Some(v) = self.$column.fieldName { model.$column.fieldName = Set(Some(v)); }
+/// Implement `IntoCondition` so QueryDto can be used directly with `.filter(query)`.
+///
+/// - String columns use `LIKE '%value%'` (contains match)
+/// - Other columns use exact `=` match
+impl IntoCondition for $queryName {
+    fn into_condition(self) -> Condition {
+#if($queryColumns.isEmpty())
+        let cond = Condition::all();
 #else
-        if let Some(v) = self.$column.fieldName { model.$column.fieldName = Set(v); }
+        let mut cond = Condition::all();
+#foreach($column in $queryColumns)
+#if($column.isStringType)
+        if let Some(v) = self.$column.fieldName {
+            if !v.is_empty() {
+                cond = cond.add(${moduleName}::Column::${tool.toPascalCase($column.name)}.contains(&v));
+            }
+        }
+#else
+        if let Some(v) = self.$column.fieldName {
+            cond = cond.add(${moduleName}::Column::${tool.toPascalCase($column.name)}.eq(v));
+        }
 #end
 #end
+#end
+        cond
     }
 }

@@ -13,8 +13,16 @@ data class TableInfo(
     /** Table name prefix to strip (e.g., "t_"). Empty = no stripping. */
     val tableNamePrefix: String = "",
     /** Column name prefix to strip (e.g., "f_"). Empty = no stripping. */
-    val columnNamePrefix: String = ""
+    val columnNamePrefix: String = "",
+    /** PostgreSQL schema name (e.g., "public", "app"). Empty = default schema. */
+    val schemaName: String = ""
 ) {
+    /** Whether this table is in a non-default schema that needs a subdirectory. */
+    val hasNonDefaultSchema: Boolean get() = schemaName.isNotEmpty() && schemaName != "public"
+
+    /** Schema subdirectory (e.g., "app" or "" for public). */
+    val schemaSubDir: String get() = if (hasNonDefaultSchema) schemaName else ""
+
     /** Table name after prefix stripping: `t_user` → `user` */
     val strippedName: String get() {
         if (tableNamePrefix.isEmpty()) return name
@@ -40,6 +48,15 @@ data class TableInfo(
     /** VO class name */
     val voName: String get() = "${entityName}Vo"
 
+    /** Query DTO class name */
+    val queryName: String get() = "Query${entityName}Dto"
+
+    /** Queryable columns (non-PK, non-timestamp — used for search/filter) */
+    val queryColumns: List<ColumnInfo>
+        get() = columns.filter {
+            !it.isPrimaryKey && !it.isAutoIncrement && it.name !in EXCLUDED_INSERT_COLUMNS
+        }
+
     /** Primary key column (first one if composite) */
     val primaryKeyColumn: ColumnInfo? get() = columns.firstOrNull { it.isPrimaryKey }
 
@@ -62,20 +79,29 @@ data class TableInfo(
         }
 
     /**
-     * Apply per-table override: filter excluded columns, apply type/name overrides.
+     * Apply per-table override: filter excluded columns, apply type/name overrides,
+     * merge ext properties, and append virtual columns.
      * Returns a new [TableInfo] with overrides applied.
      */
     fun applyOverride(override: TableOverrideConfig?): TableInfo {
         if (override == null) return this
+
+        // 1. Filter excluded columns + apply type overrides + inject ext properties
         val filteredColumns = columns
             .filter { override.isColumnIncluded(it.name) }
             .map { col ->
                 col.copy(
-                    rustType = override.getEffectiveRustType(col.name, col.rustType)
+                    rustType = override.getEffectiveRustType(col.name, col.rustType),
+                    comment = override.getEffectiveComment(col.name, col.comment),
+                    ext = override.getColumnExt(col.name)
                 )
             }
+
+        // 2. Append virtual/custom columns
+        val virtualColumns = override.customColumns.map { it.toColumnInfo() }
+
         return copy(
-            columns = filteredColumns
+            columns = filteredColumns + virtualColumns
         )
     }
 
@@ -96,7 +122,13 @@ data class ColumnInfo(
     val isNullable: Boolean,
     val isAutoIncrement: Boolean,
     val comment: String?,
-    val defaultValue: String?
+    val defaultValue: String?,
+    /** Whether this column has a single-column UNIQUE constraint (excluding PK). */
+    val isUnique: Boolean = false,
+    /** Custom ext properties accessible in templates as `$column.ext.key`. */
+    val ext: Map<String, String> = emptyMap(),
+    /** Whether this is a virtual/custom column (not in the database). */
+    val isVirtual: Boolean = false
 ) {
     /** Rust field name (snake_case, handles Rust keywords) */
     val fieldName: String
