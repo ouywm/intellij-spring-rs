@@ -1,17 +1,33 @@
 use serde::{Deserialize, Serialize};
-use spring_apalis::apalis_redis::RedisStorage;
+use spring::tracing;
 use spring_apalis::apalis::prelude::*;
-use spring_web::{axum::response::IntoResponse, extractor::Component, get};
+use spring_apalis::apalis_redis::RedisStorage;
+use spring_web::{
+    axum::response::IntoResponse,
+    extractor::Component,
+    get,
+};
+use std::time::Duration;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct BackgroundJob {
-    pub data: String,
+struct MyTask {}
+
+async fn handle_task(_task: MyTask, worker: WorkerContext) {
+    loop {
+        tracing::info!("is_shutting_down: {}", worker.is_shutting_down());
+        if worker.is_shutting_down() {
+            tracing::info!("saving the job state");
+            break;
+        }
+        tokio::time::sleep(Duration::from_secs(3)).await;
+    }
+    tracing::info!("Task completed!");
 }
 
 #[get("/start")]
 pub async fn start_job(
-    Component(mut storage): Component<RedisStorage<BackgroundJob>>,
+    Component(mut storage): Component<RedisStorage<MyTask>>,
 ) -> impl IntoResponse {
-    storage.push(BackgroundJob { data: "test".to_string() }).await.unwrap();
+    storage.push(MyTask {}).await.unwrap();
     "Job started"
 }

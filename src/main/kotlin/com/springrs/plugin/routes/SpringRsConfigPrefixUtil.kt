@@ -78,6 +78,7 @@ object SpringRsConfigPrefixUtil {
      * Finds config files under a given crate.
      */
     private fun findConfigFilesForCrate(project: Project, crateRootPath: String): List<VirtualFile> {
+        if (com.intellij.openapi.project.DumbService.isDumb(project)) return emptyList()
         val scope = GlobalSearchScope.projectScope(project)
         val normalizedRoot = crateRootPath.trimEnd('/')
 

@@ -5,11 +5,9 @@ import com.intellij.lang.annotation.Annotator
 import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.project.DumbService
 import com.intellij.psi.PsiElement
-import com.intellij.psi.search.FileTypeIndex
-import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.util.PsiTreeUtil
 import com.springrs.plugin.SpringRsBundle
-import org.rust.lang.RsFileType
+import com.springrs.plugin.routes.SpringRsComponentIndex
 import org.rust.lang.core.psi.*
 import org.rust.lang.core.psi.ext.name
 
@@ -81,20 +79,14 @@ class SpringRsDiValidationAnnotator : Annotator {
             }
     }
 
+    /**
+     * Collects all Service type names using [SpringRsComponentIndex] cached results
+     * instead of scanning the entire project on every annotate call.
+     */
     private fun collectServiceTypes(project: com.intellij.openapi.project.Project): Set<String> {
-        val services = mutableSetOf<String>()
-        val scope = GlobalSearchScope.projectScope(project)
-
-        for (vFile in FileTypeIndex.getFiles(RsFileType, scope)) {
-            val psiFile = com.intellij.psi.PsiManager.getInstance(project).findFile(vFile) as? RsFile ?: continue
-            for (struct in PsiTreeUtil.findChildrenOfType(psiFile, RsStructItem::class.java)) {
-                if (hasServiceDerive(struct)) {
-                    struct.name?.let { services.add(it) }
-                }
-            }
-        }
-
-        return services
+        return SpringRsComponentIndex.getComponentsCached(project)
+            .filter { it.type == SpringRsComponentIndex.ComponentType.SERVICE }
+            .mapTo(mutableSetOf()) { it.name }
     }
 
     companion object {
@@ -104,10 +96,24 @@ class SpringRsDiValidationAnnotator : Annotator {
         )
 
         private val FRAMEWORK_COMPONENT_TYPES = setOf(
+            // Database
             "ConnectPool", "DatabasePool", "Pool",
-            "RedisPool", "RedisConnection",
-            "AppState", "State",
+            "DbConn", "DatabaseConnection",
+            // Redis
+            "Redis", "RedisPool", "RedisConnection",
+            // Postgres
+            "Postgres", "Client",
+            // Mail
+            "Mailer",
+            // OpenDAL
+            "Op", "Operator",
+            // Stream
+            "Producer",
+            // Job
             "JobScheduler",
+            // App state
+            "AppState", "State",
+            // Primitives
             "String", "bool", "i32", "u32", "i64", "u64", "f32", "f64", "usize", "isize"
         )
     }

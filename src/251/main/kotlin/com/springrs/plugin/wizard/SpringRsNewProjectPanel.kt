@@ -51,7 +51,8 @@ class SpringRsNewProjectPanel(
         get() = SpringRsConfigurationData(
             rustSettings = rustProjectSettings.data,
             selectedPlugins = pluginSelectionPanel.selectedPlugins,
-            generateExample = pluginSelectionPanel.generateExample
+            generateExample = pluginSelectionPanel.generateExample,
+            extraDependencies = pluginSelectionPanel.extraDependencies
         )
 
     /**

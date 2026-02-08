@@ -38,7 +38,8 @@ object SpringRsProjectGenerator {
             val props = SpringRsTemplateManager.buildTemplateProperties(
                 projectName,
                 data.selectedPlugins,
-                moduleNames
+                moduleNames,
+                data.extraDependencies
             )
 
             baseDir.writeFile(this, SpringRsTemplateManager.Files.CARGO_TOML,

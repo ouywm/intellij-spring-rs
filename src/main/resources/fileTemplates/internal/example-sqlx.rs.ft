@@ -1,24 +1,13 @@
 use anyhow::Context;
-use spring_sqlx::{sqlx::{self, Row}, ConnectPool};
-use spring_web::{
-    axum::response::IntoResponse,
-    error::Result,
-    extractor::{Component, Path},
+use spring_sqlx::{
+    sqlx::{self, Row},
+    ConnectPool,
 };
-use spring_web::{get, route};
-
-#[get("/")]
-pub async fn hello_world() -> impl IntoResponse {
-    "hello world"
-}
-
-#[route("/hello/{name}", method = "GET", method = "POST")]
-pub async fn hello(Path(name): Path<String>) -> impl IntoResponse {
-    format!("hello {name}")
-}
+use spring_web::get;
+use spring_web::{error::Result, extractor::Component};
 
 #[get("/version")]
-pub async fn sqlx_request_handler(Component(pool): Component<ConnectPool>) -> Result<String> {
+async fn sqlx_request_handler(Component(pool): Component<ConnectPool>) -> Result<String> {
     let version = sqlx::query("select version() as version")
         .fetch_one(&pool)
         .await

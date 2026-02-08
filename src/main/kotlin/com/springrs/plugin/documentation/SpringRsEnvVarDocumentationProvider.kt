@@ -28,23 +28,50 @@ class SpringRsEnvVarDocumentationProvider : AbstractDocumentationProvider() {
     }
 
     override fun generateDoc(element: PsiElement?, originalElement: PsiElement?): String? {
-        val original = originalElement ?: return null
+        return generateEnvVarDoc(element, originalElement)
+    }
+
+    override fun generateHoverDoc(element: PsiElement, originalElement: PsiElement?): String? {
+        return generateEnvVarDoc(element, originalElement)
+    }
+
+    /**
+     * Shared logic for both generateDoc and generateHoverDoc.
+     *
+     * Detects `${VAR}` patterns in TOML string values and shows env var documentation.
+     * When the cursor falls on a string literal that contains env var references,
+     * we match either by cursor position or (if the entire value is a single `${VAR}`) directly.
+     */
+    private fun generateEnvVarDoc(element: PsiElement?, originalElement: PsiElement?): String? {
+        val original = originalElement ?: element ?: return null
         if (!SpringRsConfigFileUtil.isSpringRsConfigFile(original)) return null
 
         // Find the enclosing TOML string literal.
-        val literal = PsiTreeUtil.getParentOfType(original, TomlLiteral::class.java) ?: (original as? TomlLiteral) ?: return null
+        val literal = PsiTreeUtil.getParentOfType(original, TomlLiteral::class.java)
+            ?: (original as? TomlLiteral)
+            ?: return null
         if (literal.kind !is TomlLiteralKind.String) return null
 
         val text = literal.text
+        val allMatches = ENV_VAR_PATTERN.findAll(text).toList()
+        if (allMatches.isEmpty()) return null
+
+        // Try to find a match at the cursor position.
         val cursorOffsetInLiteral = original.textOffset - literal.textOffset
+        var match = allMatches.firstOrNull { m ->
+            cursorOffsetInLiteral >= m.range.first && cursorOffsetInLiteral <= m.range.last + 1
+        }
 
-        // Find which ${VAR} the cursor is on.
-        val matchAtCursor = ENV_VAR_PATTERN.findAll(text).firstOrNull { match ->
-            cursorOffsetInLiteral >= match.range.first && cursorOffsetInLiteral <= match.range.last + 1
-        } ?: return null
+        // If cursor position didn't match (e.g. originalElement == literal itself),
+        // and the string contains exactly one ${VAR}, use that directly.
+        if (match == null && allMatches.size == 1) {
+            match = allMatches[0]
+        }
 
-        val varName = matchAtCursor.groupValues[1]
-        val defaultValue = matchAtCursor.groupValues[2].takeIf { it.isNotEmpty() }
+        if (match == null) return null
+
+        val varName = match.groupValues[1]
+        val defaultValue = match.groupValues[2].takeIf { it.isNotEmpty() }
 
         val project = original.project
         val filePath = original.containingFile?.virtualFile?.path

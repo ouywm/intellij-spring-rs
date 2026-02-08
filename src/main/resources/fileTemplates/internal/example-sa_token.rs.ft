@@ -1,31 +1,41 @@
-use serde::{Deserialize, Serialize};
-use spring_sa_token::{LoginIdExtractor, StpUtil};
+use anyhow::Context;
+use spring_sa_token::{sa_check_login, sa_check_role, sa_ignore, StpUtil};
+use spring_web::extractor::Json;
 use spring_web::{
-    axum::response::{IntoResponse, Json},
+    axum::response::IntoResponse,
     error::Result,
-    extractor::Json as JsonExtractor,
     get, post,
 };
+use serde::Deserialize;
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct LoginRequest {
-    pub username: String,
-    pub password: String,
+#[derive(Deserialize)]
+struct LoginRequest {
+    username: String,
+    password: String,
 }
 
 #[post("/login")]
-pub async fn login(JsonExtractor(req): JsonExtractor<LoginRequest>) -> Result<impl IntoResponse> {
-    let token = StpUtil::login(&req.username).await?;
-    Ok(Json(serde_json::json!({
-        "token": token.as_str(),
-        "message": format!("Welcome, {}!", req.username)
-    })))
+async fn login(Json(req): Json<LoginRequest>) -> Result<impl IntoResponse> {
+    let token = StpUtil::login(&req.username)
+        .await
+        .context("Login failed")?;
+    Ok(format!("Welcome, {}! Token: {}", req.username, token.as_str()))
 }
 
+#[sa_check_login]
 #[get("/user/info")]
-pub async fn user_info(LoginIdExtractor(user_id): LoginIdExtractor) -> Result<impl IntoResponse> {
-    Ok(Json(serde_json::json!({
-        "user_id": user_id,
-        "message": "You are authenticated"
-    })))
+async fn user_info() -> Result<impl IntoResponse> {
+    Ok("Protected user info")
+}
+
+#[sa_check_role("admin")]
+#[get("/admin/dashboard")]
+async fn admin_dashboard() -> Result<impl IntoResponse> {
+    Ok("Admin dashboard")
+}
+
+#[sa_ignore]
+#[get("/health")]
+async fn health() -> impl IntoResponse {
+    "OK"
 }

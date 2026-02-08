@@ -92,9 +92,6 @@
         <!-- File icon provider - spring-rs config files -->
         <fileIconProvider
             implementation="com.springrs.plugin.icons.SpringRsConfigFileIconProvider"/>
-        <!-- File icon provider - Rust entry file (main.rs) -->
-        <fileIconProvider
-            implementation="com.springrs.plugin.icons.SpringRsMainFileIconProvider"/>
 
         <!-- Typed handler - auto trigger completion when typing '[' -->
         <typedHandler
@@ -186,7 +183,6 @@
         <codeInsight.lineMarkerProvider
             language="Rust"
             implementationClass="com.springrs.plugin.markers.SpringRsMiddlewaresLineMarkerProvider"/>
-        <!-- ProblemDetails: intentionally not adding a line marker to avoid misleading error icon -->
         <!-- Run gutter icon - override Rust default for spring-rs apps -->
         <runLineMarkerContributor language="Rust"
                                   implementationClass="com.springrs.plugin.run.SpringRsRunLineMarkerContributor"
@@ -202,10 +198,8 @@
             implementation="com.springrs.plugin.references.SpringRsReferenceContributor"/>
 
         <!-- Directory Project Generator - New Project Wizard (for non-Java IDEs like RustRover) -->
-        <!-- TODO: Temporarily disabled, waiting for spring-rs-initializr service
         <directoryProjectGenerator
             implementation="com.springrs.plugin.wizard.SpringRsDirectoryProjectGenerator"/>
-        -->
 
         <!-- Internal File Templates for project generation -->
         <internalFileTemplate name="project-Cargo.toml"/>
@@ -232,11 +226,12 @@
         <internalFileTemplate name="grpc-server.rs"/>
         <internalFileTemplate name="grpc-helloworld.proto"/>
 
-        <!-- Settings: top-level "spring-rs" group -->
+        <!-- Settings: top-level "spring-rs" group (temporarily disabled)
         <applicationConfigurable
             id="SpringRs.Settings"
             displayName="spring-rs"
             instance="com.springrs.plugin.codegen.settings.SpringRsSettingsGroup"/>
+        -->
 
     </extensions>
 

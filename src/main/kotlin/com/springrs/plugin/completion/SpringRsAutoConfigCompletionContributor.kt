@@ -15,7 +15,6 @@ import org.rust.lang.core.psi.ext.name
  * Provides completion for spring-rs configurator types:
  * - WebConfigurator
  * - JobConfigurator
- * - StreamConfigurator
  */
 class SpringRsAutoConfigCompletionContributor : CompletionContributor() {
 
@@ -35,7 +34,6 @@ class SpringRsAutoConfigCompletionContributor : CompletionContributor() {
             private val CONFIGURATORS = listOf(
                 ConfiguratorInfo("WebConfigurator", "spring_web", "Registers route handlers"),
                 ConfiguratorInfo("JobConfigurator", "spring_job", "Registers scheduled jobs"),
-                ConfiguratorInfo("StreamConfigurator", "spring_stream", "Registers stream listeners"),
             )
 
             private data class ConfiguratorInfo(val name: String, val crate: String, val description: String)

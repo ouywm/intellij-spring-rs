@@ -215,25 +215,33 @@ class SpringRsToolWindow(private val project: Project) : com.intellij.openapi.Di
             subscribe(
                 CargoProjectsService.CARGO_PROJECTS_TOPIC,
                 CargoProjectsService.CargoProjectsListener { _, _ ->
-                    scheduleRefresh()
+                    // Cargo project reload often happens during indexing; defer if needed.
+                    if (com.intellij.openapi.project.DumbService.isDumb(project)) {
+                        scheduleRefreshWhenSmart()
+                    } else {
+                        scheduleRefresh()
+                    }
                 }
             )
 
-            // Listen to any PSI changes.
+            // Listen to physical PSI changes only (skip indexing/synthetic events).
             subscribe(
                 com.intellij.psi.impl.PsiManagerImpl.ANY_PSI_CHANGE_TOPIC,
                 object : com.intellij.psi.impl.AnyPsiChangeListener {
                     override fun afterPsiChanged(isPhysical: Boolean) {
-                        scheduleRefresh()
+                        if (isPhysical && !com.intellij.openapi.project.DumbService.isDumb(project)) {
+                            scheduleRefresh()
+                        }
                     }
                 }
             )
         }
 
-        // Listen to TOML config changes.
+        // Listen to TOML config changes (skip during indexing).
         com.intellij.psi.PsiManager.getInstance(project).addPsiTreeChangeListener(
             object : PsiTreeChangeAdapter() {
                 override fun childrenChanged(event: PsiTreeChangeEvent) {
+                    if (com.intellij.openapi.project.DumbService.isDumb(project)) return
                     val file = event.file
                     if (file is TomlFile && SpringRsConfigFileUtil.isConfigFileName(file.name)) {
                         scheduleRefresh()
@@ -722,6 +730,7 @@ class SpringRsToolWindow(private val project: Project) : com.intellij.openapi.Di
      * Returns true if navigation succeeded.
      */
     private fun navigateToConfigFile(component: SpringRsComponentIndex.ComponentInfo): Boolean {
+        if (com.intellij.openapi.project.DumbService.isDumb(project)) return false
         val configPrefix = component.detail ?: return false
 
         // Find TOML config files and look for the section.
@@ -750,6 +759,7 @@ class SpringRsToolWindow(private val project: Project) : com.intellij.openapi.Di
      * Navigate to a specific key within a TOML config section.
      */
     private fun navigateToConfigKey(configPrefix: String, key: String): Boolean {
+        if (com.intellij.openapi.project.DumbService.isDumb(project)) return false
         val scope = com.intellij.psi.search.GlobalSearchScope.projectScope(project)
         val psiManager = com.intellij.psi.PsiManager.getInstance(project)
 

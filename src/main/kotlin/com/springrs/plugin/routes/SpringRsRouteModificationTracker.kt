@@ -3,6 +3,7 @@ package com.springrs.plugin.routes
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.SimpleModificationTracker
 import com.intellij.psi.impl.AnyPsiChangeListener
@@ -21,6 +22,9 @@ import com.intellij.psi.impl.PsiManagerImpl.ANY_PSI_CHANGE_TOPIC
  *
  * Note: this tracker is required because `rustStructureModificationTracker` only tracks structural changes
  * and won't increment on string literal changes inside function bodies.
+ *
+ * IMPORTANT: We skip non-physical PSI changes and changes during indexing (dumb mode)
+ * to avoid unnecessary cache invalidation that causes repeated scanning/indexing loops.
  */
 @Service(Service.Level.PROJECT)
 class SpringRsRouteModificationTracker(project: Project) : SimpleModificationTracker(), Disposable {
@@ -28,11 +32,13 @@ class SpringRsRouteModificationTracker(project: Project) : SimpleModificationTra
     init {
         val connection = project.messageBus.connect(this)
 
-        // Listen to any PSI changes (including string literal changes) to catch `.route("/path", ...)` edits.
-        // This also catches Rust structure changes, so we don't need to subscribe separately.
         connection.subscribe(ANY_PSI_CHANGE_TOPIC, object : AnyPsiChangeListener {
             override fun afterPsiChanged(isPhysical: Boolean) {
-                incModificationCount()
+                // Only invalidate on physical (real file) changes, not synthetic/indexing PSI events.
+                // Also skip during dumb mode (indexing) to prevent cache rebuild loops.
+                if (isPhysical && !DumbService.isDumb(project)) {
+                    incModificationCount()
+                }
             }
         })
     }

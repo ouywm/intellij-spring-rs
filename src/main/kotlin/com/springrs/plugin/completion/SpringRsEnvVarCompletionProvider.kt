@@ -297,6 +297,7 @@ class SpringRsEnvVarCompletionProvider : CompletionProvider<CompletionParameters
      * @return set of variable names
      */
     private fun scanUsedEnvVarsInToml(project: Project, currentCrateRoot: String?): Set<String> {
+        if (com.intellij.openapi.project.DumbService.isDumb(project)) return emptySet()
         val vars = mutableSetOf<String>()
         val scope = GlobalSearchScope.projectScope(project)
 

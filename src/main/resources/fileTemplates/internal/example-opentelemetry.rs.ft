@@ -1,9 +1,17 @@
 use spring::tracing::info;
 use spring_web::axum::response::IntoResponse;
+use spring_web::extractor::Component;
+use spring_web::error::Result;
 use spring_web::get;
 
-#[get("/")]
-pub async fn hello_world() -> impl IntoResponse {
-    info!("hello world called");
-    "hello world"
+#[get("/otel")]
+async fn otel_hello() -> impl IntoResponse {
+    info!("otel hello called");
+    "opentelemetry is working"
+}
+
+#[get("/otel/trace")]
+async fn otel_trace() -> impl IntoResponse {
+    info!("trace endpoint called");
+    "trace example"
 }

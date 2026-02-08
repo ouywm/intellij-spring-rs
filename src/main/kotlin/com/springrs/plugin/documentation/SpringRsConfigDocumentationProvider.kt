@@ -23,8 +23,11 @@ import org.toml.lang.psi.TomlInlineTable
 import org.toml.lang.psi.TomlKey
 import org.toml.lang.psi.TomlKeySegment
 import org.toml.lang.psi.TomlKeyValue
+import org.toml.lang.psi.TomlLiteral
 import org.toml.lang.psi.TomlTable
 import org.toml.lang.psi.TomlTableHeader
+import org.toml.lang.psi.ext.TomlLiteralKind
+import org.toml.lang.psi.ext.kind
 
 /**
  * spring-rs TOML config documentation provider.
@@ -58,13 +61,38 @@ class SpringRsConfigDocumentationProvider : AbstractDocumentationProvider() {
     }
 
     override fun generateDoc(element: PsiElement?, originalElement: PsiElement?): String? {
+        // If the cursor is on a value containing ${VAR}, let the env var provider handle it.
+        if (isOnEnvVarValue(originalElement ?: element)) return null
         val docInfo = findDocInfo(element) ?: findDocInfo(originalElement) ?: return null
         return buildDocumentation(docInfo)
     }
 
     override fun generateHoverDoc(element: PsiElement, originalElement: PsiElement?): String? {
+        if (isOnEnvVarValue(originalElement ?: element)) return null
         val docInfo = findDocInfo(element) ?: findDocInfo(originalElement) ?: return null
         return buildDocumentation(docInfo)
+    }
+
+    companion object {
+        private val ENV_VAR_PATTERN = Regex("""\$\{[A-Za-z_][A-Za-z0-9_]*(?::[^}]*)?\}""")
+    }
+
+    /**
+     * Returns true if the element is inside (or is) a TOML string value that contains `${VAR}`.
+     * In that case, we yield to [SpringRsEnvVarDocumentationProvider].
+     */
+    private fun isOnEnvVarValue(element: PsiElement?): Boolean {
+        if (element == null) return false
+        val literal = PsiTreeUtil.getParentOfType(element, TomlLiteral::class.java)
+            ?: (element as? TomlLiteral)
+            ?: return false
+        if (literal.kind !is TomlLiteralKind.String) return false
+        // Check if this literal is a VALUE (not a key).
+        val parent = literal.parent
+        if (parent is TomlKeyValue && parent.value == literal) {
+            return ENV_VAR_PATTERN.containsMatchIn(literal.text)
+        }
+        return false
     }
 
     override fun getQuickNavigateInfo(element: PsiElement?, originalElement: PsiElement?): String? {

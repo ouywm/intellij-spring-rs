@@ -122,6 +122,7 @@ class SpringRsServiceLineMarkerProvider : LineMarkerProviderDescriptor(), DumbAw
         private fun findInjectionUsages(): List<InjectionUsageInfo> {
             val result = mutableListOf<InjectionUsageInfo>()
             val project = serviceStruct.project
+            if (com.intellij.openapi.project.DumbService.isDumb(project)) return emptyList()
             val psiManager = com.intellij.psi.PsiManager.getInstance(project)
             val unknown = SpringRsBundle.message("springrs.common.unknown")
 

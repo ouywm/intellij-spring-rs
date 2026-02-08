@@ -1,8 +1,24 @@
-use spring_job::cron;
+use spring_job::{cron, fix_delay, fix_rate};
+use spring_job::extractor::Component;
 use std::time::SystemTime;
 
-/// Scheduled job that runs every minute
-#[cron("0 * * * * *")]
-pub async fn every_minute_job() {
-    println!("Job executed at: {:?}", SystemTime::now());
+// ── Cron expression: every 10 seconds ──
+
+#[cron("1/10 * * * * *")]
+async fn cron_job() {
+    println!("cron scheduled: {:?}", SystemTime::now());
+}
+
+// ── Fixed delay: 5 seconds after last execution completes ──
+
+#[fix_delay(5)]
+async fn fix_delay_job() {
+    println!("fix delay scheduled: {:?}", SystemTime::now());
+}
+
+// ── Fixed rate: every 5 seconds regardless of execution time ──
+
+#[fix_rate(5)]
+async fn fix_rate_job() {
+    println!("fix rate scheduled: {:?}", SystemTime::now());
 }

@@ -68,16 +68,41 @@ object SpringRsTemplateManager {
 
     /**
      * Build template properties for project generation.
+     *
+     * @param extraDependencies user-added crates from crates.io search
      */
     fun buildTemplateProperties(
         projectName: String,
         plugins: List<String>,
-        moduleNames: List<String>
+        moduleNames: List<String>,
+        extraDependencies: List<CrateSearchResult> = emptyList()
     ): Map<String, Any> {
         val defs = plugins.mapNotNull { SpringRsPluginRegistry.get(it) }
 
-        val dependencies = defs.joinToString("\n") { it.dependency }
-        val extraDeps = defs.mapNotNull { it.extraDeps.ifEmpty { null } }.joinToString("\n")
+        val selectedIds = plugins.toSet()
+        val dependencies = defs.joinToString("\n") { it.resolveDependency(selectedIds) }
+
+        // Crate names already present in the template (hardcoded in project-Cargo.toml.ft)
+        // and in plugin main dependencies — these must be excluded from EXTRA_DEPS.
+        val reservedNames = mutableSetOf("spring", "tokio", "anyhow", "serde_json")
+        defs.forEach { reservedNames.add(extractCrateName(it.dependency)) }
+
+        // Collect all extra dep lines: plugin extras first, then user extras.
+        // Deduplicate by crate name — first occurrence wins (plugin lines may include features).
+        val allExtraLines = mutableListOf<String>()
+        defs.forEach { def ->
+            def.extraDeps.lines().filter { it.isNotBlank() }.forEach { allExtraLines.add(it) }
+        }
+        extraDependencies.forEach { allExtraLines.add(it.dependencyLine) }
+
+        val seen = mutableSetOf<String>()
+        seen.addAll(reservedNames)
+        val dedupedExtras = allExtraLines.filter { line ->
+            val name = extractCrateName(line)
+            name.isNotEmpty() && seen.add(name) // returns false if already present → skip
+        }
+        val extraDeps = dedupedExtras.joinToString("\n")
+
         val buildDeps = defs.mapNotNull { it.buildDeps.ifEmpty { null } }.joinToString("\n")
         val imports = buildImports(defs, moduleNames)
         val pluginAdditions = defs.joinToString("\n") { "        .add_plugin(${it.pluginClassName})" }
@@ -102,7 +127,7 @@ object SpringRsTemplateManager {
      * This is determined by selected plugins, NOT by whether examples are generated.
      */
     private fun buildAutoConfig(
-        defs: List<SpringRsPluginRegistry.PluginDefinition>,
+        defs: List<SpringRsPlugin>,
         @Suppress("UNUSED_PARAMETER") moduleNames: List<String>
     ): String {
         val configurators = defs
@@ -115,7 +140,7 @@ object SpringRsTemplateManager {
     }
 
     private fun buildImports(
-        defs: List<SpringRsPluginRegistry.PluginDefinition>,
+        defs: List<SpringRsPlugin>,
         moduleNames: List<String>
     ): String {
         val lines = mutableListOf<String>()
@@ -170,4 +195,8 @@ object SpringRsTemplateManager {
 
     fun renderGrpcProto(project: Project?): String =
         renderTemplate(project, Templates.GRPC_PROTO)
+
+    /** Extract crate name from a Cargo.toml dependency line: `serde = "1"` → `serde` */
+    private fun extractCrateName(line: String): String =
+        line.trim().split("=", limit = 2).first().trim()
 }

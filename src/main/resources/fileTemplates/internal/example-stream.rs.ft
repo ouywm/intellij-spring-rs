@@ -1,7 +1,46 @@
-use spring_stream::stream_listener;
+use anyhow::Context;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use spring::tracing;
+use spring_stream::consumer::Consumers;
+use spring_stream::extractor::Json;
+use spring_stream::handler::TypedConsumer;
+use spring_stream::{stream_listener, Producer};
+use spring_web::get;
+use spring_web::{
+    axum::response::{IntoResponse, Json as WebJson},
+    error::Result,
+    extractor::Component,
+};
+use std::time::SystemTime;
 
-/// Stream listener for handling messages
-#[stream_listener("my-stream")]
-pub async fn handle_message(message: String) {
-    println!("Received: {}", message);
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Payload {
+    pub success: bool,
+    pub msg: String,
+}
+
+/// Register stream consumers. Call this from main via `.add_consumer(consumers())`.
+pub fn consumers() -> Consumers {
+    Consumers::new().typed_consumer(listen_topic)
+}
+
+#[stream_listener("topic")]
+async fn listen_topic(Json(payload): Json<Payload>) {
+    tracing::info!("{:#?}", payload);
+}
+
+#[get("/send")]
+async fn send_msg(Component(producer): Component<Producer>) -> Result<impl IntoResponse> {
+    let now = SystemTime::now();
+    let payload = json!({
+        "success": true,
+        "msg": format!("Sent at {:?}", now),
+    });
+    let resp = producer
+        .send_json("topic", payload)
+        .await
+        .context("send msg failed")?;
+
+    Ok(WebJson(json!({"seq": resp.sequence()})))
 }

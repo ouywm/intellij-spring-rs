@@ -62,6 +62,7 @@ object SpringRsTomlNavigationUtil {
      * @param crateRoot restrict to the given crate root (if null, search the whole project)
      */
     private fun findSpringRsConfigFiles(project: Project, crateRoot: String?): List<VirtualFile> {
+        if (com.intellij.openapi.project.DumbService.isDumb(project)) return emptyList()
         val scope = GlobalSearchScope.projectScope(project)
         return FileTypeIndex.getFiles(TomlFileType, scope)
             .asSequence()

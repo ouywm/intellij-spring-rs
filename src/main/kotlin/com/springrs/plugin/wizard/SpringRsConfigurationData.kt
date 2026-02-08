@@ -22,7 +22,8 @@ data class SpringRsSelectableItem(
 data class SpringRsConfigurationData(
     val rustSettings: RustProjectSettingsPanel.Data? = null,
     val selectedPlugins: List<String> = emptyList(),
-    val generateExample: Boolean = true
+    val generateExample: Boolean = true,
+    val extraDependencies: List<CrateSearchResult> = emptyList()
 ) {
     companion object {
         val AVAILABLE_PLUGINS = SpringRsPluginRegistry.toSelectableItems()

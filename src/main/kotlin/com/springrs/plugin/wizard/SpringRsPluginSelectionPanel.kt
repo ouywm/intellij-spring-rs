@@ -1,16 +1,23 @@
 package com.springrs.plugin.wizard
 
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.ui.JBColor
+import com.intellij.ui.JBSplitter
+import com.intellij.ui.SimpleColoredComponent
+import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.components.JBTextField
 import com.intellij.util.ui.JBUI
 import com.springrs.plugin.SpringRsBundle
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.Dimension
 import java.awt.Font
+import java.awt.event.KeyAdapter
+import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.*
@@ -18,8 +25,26 @@ import javax.swing.*
 /**
  * spring-rs Plugin Selection Panel.
  *
- * Left: Checkbox list of all plugins
- * Right: Selected plugins with remove button
+ * Layout:
+ * ```
+ * ┌──────────────────────────────────────────────────────┐
+ * │ spring-rs Plugins                                     │
+ * │ ┌──────────────────────────────────────────────────┐ │
+ * │ │ ☑ spring-web                                      │ │
+ * │ │ ☐ spring-grpc                                     │ │
+ * │ │ ...                                               │ │
+ * │ └──────────────────────────────────────────────────┘ │
+ * │ ☑ Generate code example                              │
+ * │                                                      │
+ * │ Extra Dependencies                                   │
+ * │ [Search crates.io...                  ] [Search]     │
+ * │ ┌─ Search Results ──────┬─ Added ──────────────────┐ │
+ * │ │ serde 1.0.217    [→] │ serde = "1.0.217"    [×] │ │
+ * │ │ tokio 1.42       [→] │ anyhow = "1.0.95"    [×] │ │
+ * │ │ anyhow 1.0.95    [→] │                           │ │
+ * │ └──────────────────────┴───────────────────────────┘ │
+ * └──────────────────────────────────────────────────────┘
+ * ```
  */
 class SpringRsPluginSelectionPanel(
     private val availableItems: List<SpringRsSelectableItem>,
@@ -28,185 +53,366 @@ class SpringRsPluginSelectionPanel(
 ) : JPanel(BorderLayout()) {
 
     private val checkBoxMap = mutableMapOf<String, JCheckBox>()
-    private val selectedListModel = DefaultListModel<SpringRsSelectableItem>()
-    private val selectedList = JBList(selectedListModel)
+
     private val generateExampleCheckBox = JCheckBox(SpringRsBundle.message("wizard.plugins.generate.example")).apply {
-        isSelected = true
+        isSelected = false
     }
 
+    // ── Extra dependencies ──
+    private val searchResultsModel = DefaultListModel<CrateSearchResult>()
+    private val searchResultsList = JBList(searchResultsModel)
+    private val addedDepsModel = DefaultListModel<CrateSearchResult>()
+    private val addedDepsList = JBList(addedDepsModel)
+    private val searchField = JBTextField()
+
+    // (Deduplication is handled in SpringRsTemplateManager when writing Cargo.toml,
+    //  not here — search results should show all crates without filtering.)
+
+    // ── Pagination state ──
+    private var currentQuery = ""
+    private var currentPage = 1
+    private var hasMore = false
+    private var isLoading = false
+
     val selectedPlugins: List<String>
-        get() = (0 until selectedListModel.size()).map { selectedListModel.getElementAt(it).id }
+        get() = availableItems.filter { checkBoxMap[it.id]?.isSelected == true }.map { it.id }
 
     val generateExample: Boolean
         get() = generateExampleCheckBox.isSelected
 
+    val extraDependencies: List<CrateSearchResult>
+        get() = (0 until addedDepsModel.size()).map { addedDepsModel.getElementAt(it) }
+
     init {
-        preferredSize = Dimension(700, 290)
+        preferredSize = Dimension(700, 720)
         setupUI()
         loadDefaults()
     }
 
     private fun setupUI() {
-        val mainPanel = JPanel(BorderLayout(15, 0))
+        val root = JPanel(BorderLayout(0, 10))
 
-        // Left panel - Checkbox list
-        val leftPanel = JPanel(BorderLayout()).apply {
-            preferredSize = Dimension(280, 200)
-        }
+        // ── Top: plugin list ──
+        root.add(createPluginListSection(), BorderLayout.CENTER)
 
-        // Title label (no TitledBorder, just a label)
-        val leftTitleLabel = JBLabel(SpringRsBundle.message("wizard.plugins.available")).apply {
+        // ── Bottom: extra deps ──
+        root.add(createExtraDepsSection(), BorderLayout.SOUTH)
+
+        add(root, BorderLayout.CENTER)
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // ── Plugin list (flat checkbox list)
+    // ══════════════════════════════════════════════════════════════
+
+    private fun createPluginListSection(): JPanel {
+        val section = JPanel(BorderLayout(0, 4))
+
+        val titleLabel = JBLabel(SpringRsBundle.message("wizard.plugins.available")).apply {
             font = font.deriveFont(Font.BOLD, 12f)
-            border = JBUI.Borders.emptyBottom(5)
         }
-        leftPanel.add(leftTitleLabel, BorderLayout.NORTH)
+        section.add(titleLabel, BorderLayout.NORTH)
 
-        val checkBoxPanel = JPanel().apply {
-            layout = BoxLayout(this, BoxLayout.Y_AXIS)
+        // 2-column grid: 13 plugins → 7 rows
+        val cols = 2
+        val rows = (availableItems.size + cols - 1) / cols
+        val gridPanel = JPanel(java.awt.GridLayout(rows, cols, 4, 0)).apply {
+            border = JBUI.Borders.empty(4)
         }
 
-        availableItems.forEach { item ->
-            val itemPanel = JPanel(BorderLayout()).apply {
+        for (item in availableItems) {
+            val cb = JCheckBox(item.name).apply {
                 isOpaque = false
-                maximumSize = Dimension(Int.MAX_VALUE, 28)
-                border = JBUI.Borders.empty(2, 0)
-            }
-
-            val checkBox = JCheckBox().apply {
-                isOpaque = false
-            }
-
-            val label = JBLabel(item.name).apply {
-                border = JBUI.Borders.emptyLeft(5)
                 toolTipText = item.description
             }
-
-            // Click on label also toggles checkbox
-            label.addMouseListener(object : MouseAdapter() {
-                override fun mouseClicked(e: MouseEvent) {
-                    checkBox.isSelected = !checkBox.isSelected
-                    if (checkBox.isSelected) addToSelected(item) else removeFromSelected(item)
-                }
-            })
-
-            checkBox.addActionListener {
-                if (checkBox.isSelected) addToSelected(item) else removeFromSelected(item)
-            }
-
-            itemPanel.add(checkBox, BorderLayout.WEST)
-            itemPanel.add(label, BorderLayout.CENTER)
-
-            checkBoxMap[item.id] = checkBox
-            checkBoxPanel.add(itemPanel)
+            cb.addActionListener { onSelectionChanged?.invoke() }
+            checkBoxMap[item.id] = cb
+            gridPanel.add(cb)
         }
 
-        leftPanel.add(JBScrollPane(checkBoxPanel).apply {
+        section.add(JBScrollPane(gridPanel).apply {
             border = BorderFactory.createLineBorder(JBColor.border(), 1)
+            horizontalScrollBarPolicy = ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
         }, BorderLayout.CENTER)
 
-        // Right panel - Selected list only (no description)
-        val rightPanel = JPanel(BorderLayout()).apply {
-            preferredSize = Dimension(380, 200)
-        }
+        // Generate example checkbox
+        val bottomRow = JPanel(BorderLayout()).apply { border = JBUI.Borders.emptyTop(4) }
+        bottomRow.add(generateExampleCheckBox, BorderLayout.WEST)
+        section.add(bottomRow, BorderLayout.SOUTH)
 
-        // Title label
-        val rightTitleLabel = JBLabel(SpringRsBundle.message("wizard.plugins.selected")).apply {
+        return section
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // ── Extra dependencies: left results | splitter | right added
+    // ══════════════════════════════════════════════════════════════
+
+    private fun createExtraDepsSection(): JPanel {
+        val section = JPanel(BorderLayout(0, 4))
+        section.preferredSize = Dimension(0, 440)
+
+        section.add(JBLabel(SpringRsBundle.message("wizard.deps.title")).apply {
             font = font.deriveFont(Font.BOLD, 12f)
-            border = JBUI.Borders.emptyBottom(5)
-        }
-        rightPanel.add(rightTitleLabel, BorderLayout.NORTH)
+        }, BorderLayout.NORTH)
 
-        selectedList.apply {
+        // ── Search row ──
+        val searchRow = JPanel(BorderLayout(6, 0))
+        searchField.emptyText.text = SpringRsBundle.message("wizard.deps.search.placeholder")
+        searchField.addKeyListener(object : KeyAdapter() {
+            override fun keyPressed(e: KeyEvent) {
+                if (e.keyCode == KeyEvent.VK_ENTER) doSearch()
+            }
+        })
+        val searchBtn = JButton(SpringRsBundle.message("wizard.deps.search.button")).apply {
+            addActionListener { doSearch() }
+        }
+        searchRow.add(searchField, BorderLayout.CENTER)
+        searchRow.add(searchBtn, BorderLayout.EAST)
+
+        // ── Left: search results ──
+        searchResultsList.apply {
             selectionMode = ListSelectionModel.SINGLE_SELECTION
-            cellRenderer = SelectedItemRenderer()
+            cellRenderer = SearchResultRenderer()
+            emptyText.text = SpringRsBundle.message("wizard.deps.search.placeholder")
             addMouseListener(object : MouseAdapter() {
                 override fun mouseClicked(e: MouseEvent) {
-                    val index = locationToIndex(e.point)
-                    if (index >= 0) {
-                        val cellBounds = getCellBounds(index, index)
-                        // Click on X button (right 28px area)
+                    if (e.clickCount == 2) addSelectedResult()
+                }
+            })
+            addKeyListener(object : KeyAdapter() {
+                override fun keyPressed(e: KeyEvent) {
+                    if (e.keyCode == KeyEvent.VK_ENTER) addSelectedResult()
+                }
+            })
+        }
+
+        val searchScrollPane = JBScrollPane(searchResultsList).apply {
+            border = BorderFactory.createLineBorder(JBColor.border(), 1)
+        }
+
+        // Scroll-to-bottom → auto-load next page
+        searchScrollPane.verticalScrollBar.addAdjustmentListener { e ->
+            val sb = e.adjustable
+            if (!e.valueIsAdjusting && hasMore && !isLoading
+                && sb.value + sb.visibleAmount >= sb.maximum - 20
+            ) {
+                loadMore()
+            }
+        }
+
+        val leftPanel = JPanel(BorderLayout(0, 2))
+        leftPanel.add(JBLabel(SpringRsBundle.message("wizard.deps.results.title")).apply {
+            border = JBUI.Borders.emptyBottom(2)
+        }, BorderLayout.NORTH)
+        leftPanel.add(searchScrollPane, BorderLayout.CENTER)
+
+        // ── Right: added dependencies ──
+        addedDepsList.apply {
+            selectionMode = ListSelectionModel.SINGLE_SELECTION
+            cellRenderer = AddedDepRenderer()
+            emptyText.text = SpringRsBundle.message("wizard.deps.added.empty")
+            addMouseListener(object : MouseAdapter() {
+                override fun mouseClicked(e: MouseEvent) {
+                    val idx = locationToIndex(e.point)
+                    if (idx >= 0) {
+                        val cellBounds = getCellBounds(idx, idx)
                         if (e.x >= cellBounds.x + cellBounds.width - 28) {
-                            removeFromSelected(selectedListModel.getElementAt(index))
+                            addedDepsModel.remove(idx)
                         }
                     }
                 }
             })
+            addKeyListener(object : KeyAdapter() {
+                override fun keyPressed(e: KeyEvent) {
+                    if (e.keyCode == KeyEvent.VK_DELETE || e.keyCode == KeyEvent.VK_BACK_SPACE) {
+                        val idx = addedDepsList.selectedIndex
+                        if (idx >= 0) addedDepsModel.remove(idx)
+                    }
+                }
+            })
         }
-        rightPanel.add(JBScrollPane(selectedList).apply {
+
+        val rightPanel = JPanel(BorderLayout(0, 2))
+        rightPanel.add(JBLabel(SpringRsBundle.message("wizard.deps.added.title")).apply {
+            border = JBUI.Borders.emptyBottom(2)
+        }, BorderLayout.NORTH)
+        rightPanel.add(JBScrollPane(addedDepsList).apply {
             border = BorderFactory.createLineBorder(JBColor.border(), 1)
         }, BorderLayout.CENTER)
 
-        mainPanel.add(leftPanel, BorderLayout.WEST)
-        mainPanel.add(rightPanel, BorderLayout.CENTER)
-
-        add(mainPanel, BorderLayout.CENTER)
-
-        // Bottom: Generate example checkbox
-        val bottomPanel = JPanel(BorderLayout()).apply {
-            border = JBUI.Borders.emptyTop(10)
+        // ── Splitter: left | right ──
+        val splitter = JBSplitter(false, 0.5f).apply {
+            firstComponent = leftPanel
+            secondComponent = rightPanel
         }
-        bottomPanel.add(generateExampleCheckBox, BorderLayout.WEST)
-        add(bottomPanel, BorderLayout.SOUTH)
+
+        val centerPanel = JPanel(BorderLayout(0, 4))
+        centerPanel.add(searchRow, BorderLayout.NORTH)
+        centerPanel.add(splitter, BorderLayout.CENTER)
+
+        section.add(centerPanel, BorderLayout.CENTER)
+        return section
     }
 
-    private fun loadDefaults() {
-        availableItems.filter { it.id in defaultSelected }.forEach { item ->
-            checkBoxMap[item.id]?.isSelected = true
-            selectedListModel.addElement(item)
+    // ══════════════════════════════════════════════════════════════
+    // ── Search & add logic
+    // ══════════════════════════════════════════════════════════════
+
+    /** New search: clear results, reset page, load first page. */
+    private fun doSearch() {
+        val query = searchField.text.trim()
+        if (query.isEmpty()) return
+
+        currentQuery = query
+        currentPage = 1
+        hasMore = false
+        searchResultsModel.clear()
+
+        fetchPage()
+    }
+
+    /** Load next page of results, appending to the existing list. */
+    private fun loadMore() {
+        if (!hasMore || isLoading) return
+        currentPage++
+        fetchPage()
+    }
+
+    /** Fetch a single page from crates.io and append filtered results. */
+    private fun fetchPage() {
+        isLoading = true
+        searchField.isEnabled = false
+        searchResultsList.emptyText.text = SpringRsBundle.message("wizard.deps.searching")
+
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val page = CratesIoSearchService.search(currentQuery, currentPage)
+
+            SwingUtilities.invokeLater {
+                isLoading = false
+                searchField.isEnabled = true
+
+                if (page.error != null) {
+                    searchResultsList.emptyText.text = SpringRsBundle.message("wizard.deps.search.error")
+                    searchResultsList.emptyText.appendLine(page.error)
+                } else if (page.crates.isEmpty() && currentPage == 1) {
+                    searchResultsList.emptyText.text = SpringRsBundle.message("wizard.deps.no.results")
+                } else {
+                    searchResultsList.emptyText.text = SpringRsBundle.message("wizard.deps.search.placeholder")
+                }
+
+                hasMore = page.hasMore
+                val filtered = deduplicateResults(page.crates)
+                filtered.forEach { searchResultsModel.addElement(it) }
+
+                if (currentPage == 1) {
+                    searchField.requestFocusInWindow()
+                }
+            }
         }
     }
 
-    private fun addToSelected(item: SpringRsSelectableItem) {
-        val exists = (0 until selectedListModel.size()).any {
-            selectedListModel.getElementAt(it).id == item.id
-        }
-        if (!exists) {
-            selectedListModel.addElement(item)
-            onSelectionChanged?.invoke()
+    /**
+     * Only filter out crates already shown in the search list (prevents duplicates
+     * when loading next page). Does NOT filter by added deps — search results
+     * always show everything, dedup happens in TemplateManager when writing Cargo.toml.
+     */
+    private fun deduplicateResults(results: List<CrateSearchResult>): List<CrateSearchResult> {
+        val existingNames = (0 until searchResultsModel.size())
+            .map { searchResultsModel.getElementAt(it).name }
+            .toSet()
+
+        return results.filter { it.name !in existingNames }
+    }
+
+    /** Move the selected search result to the added list. */
+    private fun addSelectedResult() {
+        val selected = searchResultsList.selectedValue ?: return
+        val idx = searchResultsList.selectedIndex
+
+        addedDepsModel.addElement(selected)
+        searchResultsModel.remove(idx)
+
+        // Select next item if available
+        if (searchResultsModel.size() > 0) {
+            searchResultsList.selectedIndex = idx.coerceAtMost(searchResultsModel.size() - 1)
         }
     }
 
-    private fun removeFromSelected(item: SpringRsSelectableItem) {
-        selectedListModel.removeElement(item)
-        checkBoxMap[item.id]?.isSelected = false
-        onSelectionChanged?.invoke()
+    // ══════════════════════════════════════════════════════════════
+    // ── Cell renderers
+    // ══════════════════════════════════════════════════════════════
+
+    /** Renders search results: `serde 1.0.217  A serialization framework` */
+    private class SearchResultRenderer : ListCellRenderer<CrateSearchResult> {
+        private val component = SimpleColoredComponent()
+
+        override fun getListCellRendererComponent(
+            list: JList<out CrateSearchResult>?, value: CrateSearchResult?,
+            index: Int, isSelected: Boolean, cellHasFocus: Boolean
+        ): Component {
+            component.clear()
+            component.icon = AllIcons.Nodes.PpLib
+            if (value != null) {
+                component.append(value.name, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
+                component.append(" ${value.version}", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                if (value.description.isNotEmpty()) {
+                    val desc = if (value.description.length > 40)
+                        value.description.take(37) + "..." else value.description
+                    component.append("  $desc", SimpleTextAttributes.GRAY_SMALL_ATTRIBUTES)
+                }
+            }
+            if (isSelected) {
+                component.background = list?.selectionBackground
+                component.foreground = list?.selectionForeground
+                component.isOpaque = true
+            } else {
+                component.isOpaque = false
+            }
+            return component
+        }
     }
 
-    private inner class SelectedItemRenderer : ListCellRenderer<SpringRsSelectableItem> {
+    /** Renders added dependencies: `serde = "1.0.217"  [×]` */
+    private inner class AddedDepRenderer : ListCellRenderer<CrateSearchResult> {
         private val panel = JPanel(BorderLayout()).apply {
-            border = JBUI.Borders.empty(4, 8)
+            border = JBUI.Borders.empty(2, 6)
         }
         private val nameLabel = JBLabel()
-        private val removeButton = JBLabel(AllIcons.Actions.Close).apply {
-            border = JBUI.Borders.empty(0, 5)
-            toolTipText = SpringRsBundle.message("wizard.plugins.remove.tooltip")
+        private val removeIcon = JBLabel(AllIcons.Actions.Close).apply {
+            toolTipText = SpringRsBundle.message("wizard.deps.remove.tooltip")
+            border = JBUI.Borders.empty(0, 4)
         }
 
         override fun getListCellRendererComponent(
-            list: JList<out SpringRsSelectableItem>?,
-            value: SpringRsSelectableItem?,
-            index: Int,
-            isSelected: Boolean,
-            cellHasFocus: Boolean
+            list: JList<out CrateSearchResult>?, value: CrateSearchResult?,
+            index: Int, isSelected: Boolean, cellHasFocus: Boolean
         ): Component {
-            nameLabel.text = value?.name ?: ""
-            nameLabel.icon = AllIcons.Nodes.Plugin
+            nameLabel.text = value?.dependencyLine ?: ""
+            nameLabel.icon = AllIcons.Nodes.PpLib
 
             panel.removeAll()
             panel.add(nameLabel, BorderLayout.CENTER)
-            panel.add(removeButton, BorderLayout.EAST)
+            panel.add(removeIcon, BorderLayout.EAST)
 
             if (isSelected) {
-                panel.background = list?.selectionBackground ?: JBColor.BLUE
-                nameLabel.foreground = list?.selectionForeground ?: JBColor.WHITE
+                panel.background = list?.selectionBackground
                 panel.isOpaque = true
             } else {
-                panel.background = list?.background ?: JBColor.WHITE
-                nameLabel.foreground = list?.foreground ?: JBColor.BLACK
                 panel.isOpaque = false
             }
-
             return panel
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // ── Defaults
+    // ══════════════════════════════════════════════════════════════
+
+    private fun loadDefaults() {
+        for (item in availableItems) {
+            if (item.id in defaultSelected) {
+                checkBoxMap[item.id]?.isSelected = true
+            }
         }
     }
 }

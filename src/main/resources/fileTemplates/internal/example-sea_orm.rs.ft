@@ -6,9 +6,15 @@ use spring_web::{
     extractor::Component,
 };
 
+// TODO: Define your entities and import them here.
+// Example:
+//   use sea_orm::EntityTrait;
+//   use crate::entities::prelude::MyEntity;
+
 #[get("/")]
-pub async fn list_items(Component(db): Component<DbConn>) -> Result<impl IntoResponse> {
-    // Example: Query all items from a table
-    // let items = YourEntity::find().all(&db).await?;
-    Ok(Json("SeaORM example - create your entities first"))
+async fn list_items(Component(_db): Component<DbConn>) -> Result<impl IntoResponse> {
+    // Example:
+    //   let rows = MyEntity::find().all(&db).await.context("query failed")?;
+    //   Ok(Json(rows))
+    Ok(Json("sea-orm ready — define your entities to get started"))
 }

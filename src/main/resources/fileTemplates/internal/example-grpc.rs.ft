@@ -1,15 +1,28 @@
-// gRPC Example
-//
-// To use gRPC:
-// 1. Create proto files in proto/ directory
-// 2. Add build.rs to compile proto files
-// 3. Implement the service trait
-//
-// Example proto file (proto/helloworld.proto):
-// syntax = "proto3";
-// package helloworld;
-// service Greeter {
-//     rpc SayHello (HelloRequest) returns (HelloReply);
-// }
-// message HelloRequest { string name = 1; }
-// message HelloReply { string message = 1; }
+use spring::plugin::service::Service;
+use tonic::{Request, Response, Status};
+
+pub mod hello_world {
+    tonic::include_proto!("helloworld");
+}
+
+use hello_world::greeter_server::{Greeter, GreeterServer};
+use hello_world::{HelloReply, HelloRequest};
+
+#[derive(Clone, Service)]
+#[service(grpc = "GreeterServer")]
+struct MyGreeter;
+
+#[tonic::async_trait]
+impl Greeter for MyGreeter {
+    async fn say_hello(
+        &self,
+        request: Request<HelloRequest>,
+    ) -> Result<Response<HelloReply>, Status> {
+        println!("Got a request from {:?}", request.remote_addr());
+
+        let reply = HelloReply {
+            message: format!("Hello {}!", request.into_inner().name),
+        };
+        Ok(Response::new(reply))
+    }
+}
