@@ -21,6 +21,7 @@ import com.springrs.plugin.codegen.layer.EntityLayer
 import com.springrs.plugin.codegen.layer.RouteLayer
 import com.springrs.plugin.codegen.layer.ServiceLayer
 import com.springrs.plugin.codegen.layer.VoLayer
+import com.springrs.plugin.utils.SpringRsConstants.DERIVE_VALIDATE
 import java.io.File
 
 /**
@@ -139,7 +140,8 @@ class GenerateSeaOrmAction : AnAction() {
                 allDerives.addAll(dialog.entityExtraDerives)
                 allDerives.addAll(dialog.dtoExtraDerives)
                 allDerives.addAll(dialog.voExtraDerives)
-                val addedCrates = CargoDependencyManager.ensureDependencies(project, allDerives, effectiveTableInfos)
+                val routeWithValidate = dialog.isRouteEnabled && DERIVE_VALIDATE in dialog.dtoExtraDerives
+                val addedCrates = CargoDependencyManager.ensureDependencies(project, allDerives, effectiveTableInfos, routeWithValidate)
 
                 val fmtSuffix = if (formattedCount > 0) " (${formattedCount} formatted)" else ""
                 val depSuffix = if (addedCrates.isNotEmpty()) "\nAdded to Cargo.toml: ${addedCrates.joinToString(", ")}" else ""
@@ -170,33 +172,51 @@ class GenerateSeaOrmAction : AnAction() {
         relationsMap: Map<String, List<RelationInfo>> = emptyMap()
     ): List<LayerConfig> {
         val settings = CodeGenSettingsState.getInstance(project)
+
+        // Per-table layer dependency propagation (mirrors dialog-level logic):
+        // Route → Service + DTO; Service → DTO + VO + Entity; DTO/VO → Entity
+        fun isRouteEnabledFor(table: String): Boolean =
+            settings.tableOverrides[table]?.generateRoute ?: true
+
+        fun isServiceEnabledFor(table: String): Boolean =
+            (settings.tableOverrides[table]?.generateService ?: true) || isRouteEnabledFor(table)
+
+        fun isDtoEnabledFor(table: String): Boolean =
+            (settings.tableOverrides[table]?.generateDto ?: true) || isServiceEnabledFor(table) || isRouteEnabledFor(table)
+
+        fun isVoEnabledFor(table: String): Boolean =
+            (settings.tableOverrides[table]?.generateVo ?: true) || isServiceEnabledFor(table)
+
+        fun isEntityEnabledFor(table: String): Boolean =
+            (settings.tableOverrides[table]?.generateEntity ?: true) || isDtoEnabledFor(table) || isVoEnabledFor(table) || isServiceEnabledFor(table)
+
         return listOf(
             LayerConfig(
                 EntityLayer(dialog.entityExtraDerives, relationsMap, dialog.entityDerivesOverrides),
                 dialog.isEntityEnabled, dialog.entityOutputDir,
-                isTableEnabled = { settings.tableOverrides[it]?.generateEntity ?: true },
+                isTableEnabled = ::isEntityEnabledFor,
                 outputDirForTable = dialog.entityOutputDirForTable
             ),
             LayerConfig(
                 DtoLayer(dialog.dtoExtraDerives, dialog.dtoDerivesOverrides),
                 dialog.isDtoEnabled, dialog.dtoOutputDir,
-                isTableEnabled = { settings.tableOverrides[it]?.generateDto ?: true },
+                isTableEnabled = ::isDtoEnabledFor,
                 outputDirForTable = dialog.dtoOutputDirForTable
             ),
             LayerConfig(
                 VoLayer(dialog.voExtraDerives, dialog.voDerivesOverrides),
                 dialog.isVoEnabled, dialog.voOutputDir,
-                isTableEnabled = { settings.tableOverrides[it]?.generateVo ?: true },
+                isTableEnabled = ::isVoEnabledFor,
                 outputDirForTable = dialog.voOutputDirForTable
             ),
             LayerConfig(
                 ServiceLayer(), dialog.isServiceEnabled, dialog.serviceOutputDir,
-                isTableEnabled = { settings.tableOverrides[it]?.generateService ?: true },
+                isTableEnabled = ::isServiceEnabledFor,
                 outputDirForTable = dialog.serviceOutputDirForTable
             ),
             LayerConfig(
-                RouteLayer(), dialog.isRouteEnabled, dialog.routeOutputDir,
-                isTableEnabled = { settings.tableOverrides[it]?.generateRoute ?: true },
+                RouteLayer(dialog.dtoExtraDerives), dialog.isRouteEnabled, dialog.routeOutputDir,
+                isTableEnabled = ::isRouteEnabledFor,
                 outputDirForTable = dialog.routeOutputDirForTable
             )
         )

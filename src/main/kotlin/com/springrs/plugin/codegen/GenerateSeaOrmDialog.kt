@@ -704,7 +704,7 @@ class GenerateSeaOrmDialog(
                 outputDirForTable = { tableConfigs[it]?.serviceOutputDir ?: serviceBaseDir }
             ),
             LayerConfig(
-                RouteLayer(), isRouteEnabled, routeBaseDir,
+                RouteLayer(dtoExtraDerives), isRouteEnabled, routeBaseDir,
                 isTableEnabled = { tableConfigs[it]?.generateRoute ?: true },
                 outputDirForTable = { tableConfigs[it]?.routeOutputDir ?: routeBaseDir }
             )
@@ -784,11 +784,21 @@ class GenerateSeaOrmDialog(
 
     // ── Public accessors ──
 
-    val isEntityEnabled get() = if (isMultiTable) tableConfigs.values.any { it.generateEntity } else entityCheckBox.isSelected
-    val isDtoEnabled get() = if (isMultiTable) tableConfigs.values.any { it.generateDto } else dtoCheckBox.isSelected
-    val isVoEnabled get() = if (isMultiTable) tableConfigs.values.any { it.generateVo } else voCheckBox.isSelected
-    val isServiceEnabled get() = if (isMultiTable) tableConfigs.values.any { it.generateService } else serviceCheckBox.isSelected
-    val isRouteEnabled get() = if (isMultiTable) tableConfigs.values.any { it.generateRoute } else routeCheckBox.isSelected
+    // ── Layer dependency auto-propagation ──
+    // Route → Service + DTO; Service → DTO + VO + Entity; DTO/VO → Entity
+    // "Enabled" = user checked OR required by an upstream layer that is enabled.
+
+    private val isRouteChecked get() = if (isMultiTable) tableConfigs.values.any { it.generateRoute } else routeCheckBox.isSelected
+    private val isServiceChecked get() = if (isMultiTable) tableConfigs.values.any { it.generateService } else serviceCheckBox.isSelected
+    private val isVoChecked get() = if (isMultiTable) tableConfigs.values.any { it.generateVo } else voCheckBox.isSelected
+    private val isDtoChecked get() = if (isMultiTable) tableConfigs.values.any { it.generateDto } else dtoCheckBox.isSelected
+    private val isEntityChecked get() = if (isMultiTable) tableConfigs.values.any { it.generateEntity } else entityCheckBox.isSelected
+
+    val isRouteEnabled get() = isRouteChecked
+    val isServiceEnabled get() = isServiceChecked || isRouteEnabled
+    val isDtoEnabled get() = isDtoChecked || isServiceEnabled || isRouteEnabled
+    val isVoEnabled get() = isVoChecked || isServiceEnabled
+    val isEntityEnabled get() = isEntityChecked || isDtoEnabled || isVoEnabled || isServiceEnabled
 
     val entityOutputDir get() = entityBaseDir
     val dtoOutputDir get() = dtoBaseDir

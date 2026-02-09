@@ -4,6 +4,9 @@
 ## Only list + create + delete. No get-by-id or update.
 use ${dtoModulePath}::${moduleName}_dto::{${dtoCreateName}, ${queryName}};
 use ${serviceModulePath}::${moduleName}_service::${serviceName};
+#if($addValidate)
+use axum_valid::Valid;
+#end
 use spring_sea_orm::pagination::Pagination;
 use spring_web::axum::http::StatusCode;
 use spring_web::axum::response::IntoResponse;
@@ -28,7 +31,11 @@ pub async fn ${moduleName}_page(
 #[post("${base}")]
 pub async fn ${moduleName}_create(
     Component(service): Component<${serviceName}>,
+#if($addValidate)
+    Valid(Json(dto)): Valid<Json<${dtoCreateName}>>,
+#else
     Json(dto): Json<${dtoCreateName}>,
+#end
 ) -> Result<impl IntoResponse> {
     let result = service.create(dto).await?;
     Ok(Json(result))
@@ -38,7 +45,11 @@ pub async fn ${moduleName}_create(
 #[delete("${base}")]
 pub async fn ${moduleName}_delete(
     Component(service): Component<${serviceName}>,
+#if($addValidate)
+    Valid(Json(dto)): Valid<Json<${dtoCreateName}>>,
+#else
     Json(dto): Json<${dtoCreateName}>,
+#end
 ) -> Result<impl IntoResponse> {
     service.delete_by_ids(dto).await?;
     Ok(StatusCode::NO_CONTENT)
@@ -49,6 +60,9 @@ use ${dtoModulePath}::${moduleName}_dto::{${dtoCreateName}, ${dtoUpdateName}, ${
 use ${serviceModulePath}::${moduleName}_service::${serviceName};
 #if($primaryKeyType == "Uuid")
 use sea_orm::prelude::Uuid;
+#end
+#if($addValidate)
+use axum_valid::Valid;
 #end
 use spring_sea_orm::pagination::Pagination;
 use spring_web::axum::http::StatusCode;
@@ -85,7 +99,11 @@ pub async fn ${moduleName}_get_by_id(
 #[post("${base}")]
 pub async fn ${moduleName}_create(
     Component(service): Component<${serviceName}>,
+#if($addValidate)
+    Valid(Json(dto)): Valid<Json<${dtoCreateName}>>,
+#else
     Json(dto): Json<${dtoCreateName}>,
+#end
 ) -> Result<impl IntoResponse> {
     let result = service.create(dto).await?;
     Ok(Json(result))
@@ -96,7 +114,11 @@ pub async fn ${moduleName}_create(
 pub async fn ${moduleName}_update(
     Component(service): Component<${serviceName}>,
     Path(id): Path<${primaryKeyType}>,
+#if($addValidate)
+    Valid(Json(dto)): Valid<Json<${dtoUpdateName}>>,
+#else
     Json(dto): Json<${dtoUpdateName}>,
+#end
 ) -> Result<impl IntoResponse> {
     let result = service.update(id, dto).await?;
     Ok(Json(result))

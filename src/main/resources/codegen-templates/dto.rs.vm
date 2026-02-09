@@ -32,6 +32,13 @@ pub struct $dtoCreateName {
 #if($column.comment != "")
     /// $column.comment
 #end
+#if($addValidate && $column.rustType == "String" && !$column.isNullable)
+#if($column.comment != "")
+    #[validate(length(min = 1, message = "${column.comment}不能为空"))]
+#else
+    #[validate(length(min = 1, message = "${column.fieldName}不能为空"))]
+#end
+#end
     pub $column.fieldName: $column.fullRustType,
 #end
 }
@@ -58,6 +65,13 @@ pub struct $dtoUpdateName {
 #foreach($column in $updateColumns)
 #if($column.comment != "")
     /// $column.comment
+#end
+#if($addValidate && $column.rustType == "String" && !$column.isNullable)
+#if($column.comment != "")
+    #[validate(length(min = 1, message = "${column.comment}不能为空"))]
+#else
+    #[validate(length(min = 1, message = "${column.fieldName}不能为空"))]
+#end
 #end
     pub $column.fieldName: $column.fullRustType,
 #end

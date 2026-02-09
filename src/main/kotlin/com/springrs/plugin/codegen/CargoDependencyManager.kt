@@ -28,6 +28,7 @@ object CargoDependencyManager {
 
     private val CHRONO_DEP = CrateDep("chrono", """chrono = { version = "0.4", features = ["serde"] }""")
     private val SERDE_DEP = CrateDep("serde", """serde = { version = "1", features = ["derive"] }""")
+    private val AXUM_VALID_DEP = CrateDep("axum-valid", """axum-valid = { version = "0.24", features = ["validator"] }""")
 
     /** Derive macro → crate dependency. Built-in derives not listed. */
     private val DERIVE_DEPS: Map<String, CrateDep> = mapOf(
@@ -35,7 +36,7 @@ object CargoDependencyManager {
         DERIVE_DESERIALIZE to SERDE_DEP,
         DERIVE_BUILDER to CrateDep("bon", """bon = "3""""),
         DERIVE_JSON_SCHEMA to CrateDep("schemars", """schemars = { version = "0.8", features = ["chrono", "uuid1"] }"""),
-        DERIVE_VALIDATE to CrateDep("validator", """validator = { version = "0.19", features = ["derive"] }"""),
+        DERIVE_VALIDATE to CrateDep("validator", """validator = { version = "0.20", features = ["derive"] }"""),
     )
 
     /** Rust type → crate dependency. Only external crates. */
@@ -55,12 +56,14 @@ object CargoDependencyManager {
      * @param project  Current project
      * @param derives  Selected derive macro names
      * @param tables   Tables being generated (to detect column types)
+     * @param routeWithValidate  Whether Route layer uses `Valid<Json<T>>` (requires axum-valid)
      * @return List of crate names that were added
      */
     fun ensureDependencies(
         project: Project,
         derives: Set<String>,
-        tables: List<TableInfo> = emptyList()
+        tables: List<TableInfo> = emptyList(),
+        routeWithValidate: Boolean = false
     ): List<String> {
         val basePath = project.basePath ?: return emptyList()
         val cargoFile = File(basePath, "Cargo.toml")
@@ -77,6 +80,9 @@ object CargoDependencyManager {
         // 2. From column types
         val allTypes = tables.flatMap { t -> t.columns.map { it.rustType } }.toSet()
         for (type in allTypes) { TYPE_DEPS[type]?.let(::require) }
+
+        // 3. Route with validation → needs axum-valid
+        if (routeWithValidate) require(AXUM_VALID_DEP)
 
         if (needed.isEmpty()) return emptyList()
 

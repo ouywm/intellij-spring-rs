@@ -238,7 +238,9 @@ class ServiceLayer : CodegenLayer() {
 // ── Route Layer
 // ══════════════════════════════════════════════════════════════
 
-class RouteLayer : CodegenLayer() {
+class RouteLayer(
+    private val dtoExtraDerives: Set<String> = emptySet()
+) : CodegenLayer() {
 
     override val id = "route"
     override val templateName = "route"
@@ -247,5 +249,7 @@ class RouteLayer : CodegenLayer() {
     override fun modName(table: TableInfo) = "${table.moduleName}_route"
 
     override fun generate(table: TableInfo, project: Project): String =
-        VelocityTemplateEngine.generateFromTemplate(project, templateName, table)
+        VelocityTemplateEngine.generateFromTemplate(project, templateName, table) { ctx ->
+            ctx["addValidate"] = DERIVE_VALIDATE in dtoExtraDerives
+        }
 }
