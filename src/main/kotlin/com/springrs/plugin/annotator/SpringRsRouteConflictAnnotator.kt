@@ -14,7 +14,6 @@ import com.intellij.psi.PsiFile
 import com.springrs.plugin.SpringRsBundle
 import com.springrs.plugin.routes.SpringRsRouteIndex
 import com.springrs.plugin.routes.SpringRsRouteUtil
-import com.springrs.plugin.routes.SpringRsUnifiedScanner
 import org.rust.lang.core.psi.RsFile
 import org.rust.lang.core.psi.RsFunction
 import org.rust.lang.core.psi.RsMethodCall
@@ -53,7 +52,7 @@ class SpringRsRouteConflictAnnotator : Annotator {
                 val conflicts = allRoutes.filter { other ->
                     other.method.equals(myRoute.method, ignoreCase = true)
                         && other.fullPath == myFullPath
-                        && !(other.file == myFile && other.offset == (fn.identifier?.textOffset ?: fn.textOffset))
+                        && !(other.file == myFile && other.offset == fn.identifier.textOffset)
                         && isSameCrate(crateRoot, other.file.path)
                 }
 

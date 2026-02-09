@@ -27,10 +27,6 @@ import java.io.File
  */
 class SpringRsEnvVarAnnotator : Annotator {
 
-    companion object {
-        private val ENV_VAR_PATTERN = Regex("""\$\{([A-Za-z_][A-Za-z0-9_]*)(?::([^}]*))?\}""")
-    }
-
     override fun annotate(element: PsiElement, holder: AnnotationHolder) {
         if (DumbService.isDumb(element.project)) return
         if (!SpringRsConfigFileUtil.isSpringRsConfigFile(element)) return
@@ -145,3 +141,5 @@ class SpringRsEnvVarAnnotator : Annotator {
         }
     }
 }
+
+private val ENV_VAR_PATTERN = Regex("""\$\{([A-Za-z_][A-Za-z0-9_]*)(?::([^}]*))?}""")

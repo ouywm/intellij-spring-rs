@@ -21,49 +21,77 @@
           <li><b>Navigation</b> — Ctrl+Click to jump between TOML keys and Rust struct fields</li>
           <li><b>Validation</b> — unknown keys, type mismatches, invalid enums with quick-fixes</li>
           <li><b>Documentation</b> — hover to see field type, default value, and doc comments</li>
-          <li><b>Enum Completion</b> — all variants from Rust enum definitions</li>
+          <li><b>Environment Variables</b> — completion, validation, documentation, navigation for <code>${VAR}</code> in TOML</li>
         </ul>
 
-        <h3>Route Explorer</h3>
+        <h3>Search Everywhere</h3>
         <ul>
-          <li><b>Tool Window</b> — list all HTTP routes, organized by crate/module/file</li>
-          <li><b>Color-coded Methods</b> — GET/POST/PUT/DELETE/PATCH with distinct colors</li>
-          <li><b>Gutter Icons</b> — HTTP method badges on handler functions</li>
-          <li><b>Search &amp; Filter</b> — by path, method, or handler name</li>
-          <li>Supports <code>#[get("/path")]</code> macros and <code>Router::new().route()</code> builder</li>
+          <li>Double-Shift to search routes, jobs, stream listeners, and components</li>
+          <li>Results show file path and line number for quick navigation</li>
         </ul>
 
-        <h3>Run Configuration</h3>
+        <h3>Unified Tool Window</h3>
         <ul>
-          <li>Dedicated run config with spring-rs gutter icon on <code>main()</code></li>
-          <li>Right-click to Run, Debug, or Edit configuration</li>
+          <li>Browse Endpoints, Jobs, Stream Listeners, Components, Configurations, Plugins</li>
+          <li>Type and module filters, search, tree view with double-click navigation</li>
         </ul>
 
-        <h3>Service &amp; Injection</h3>
+        <h3>Gutter Line Markers</h3>
         <ul>
-          <li>Gutter icons for services and <code>#[inject]</code> dependencies</li>
-          <li>Click to navigate between services and injection sites</li>
+          <li><b>Routes</b> — color-coded HTTP method badges (<code>#[get]</code>, <code>#[post]</code>, Router builder)</li>
+          <li><b>Jobs</b> — clock icon on <code>#[cron]</code>, <code>#[fix_delay]</code>, <code>#[fix_rate]</code></li>
+          <li><b>Stream Listeners</b> — listener icon on <code>#[stream_listener]</code></li>
+          <li><b>Cache</b> — cache icon on <code>#[cache]</code></li>
+          <li><b>sa-token</b> — security icon on <code>#[sa_check_login]</code>, <code>#[sa_check_role]</code></li>
+          <li><b>Socket.IO</b> — web icon on <code>#[on_connection]</code>, <code>#[subscribe_message]</code></li>
+          <li><b>Middlewares</b> — middleware icon on <code>#[middlewares]</code></li>
+          <li><b>Services</b> — gutter icons for <code>#[derive(Service)]</code> and <code>#[inject]</code></li>
         </ul>
 
-        <h3>JSON to Rust Struct</h3>
+        <h3>Code Generation</h3>
         <ul>
-          <li>Convert JSON to Rust structs with serde attributes</li>
-          <li>Configurable derives, visibility, rename options</li>
-          <li>Nested structs, <code>Vec&lt;T&gt;</code>, <code>Option&lt;T&gt;</code>, camelCase conversion</li>
+          <li><b>Sea-ORM</b> — generate Entity/DTO/VO/Service/Route from database tables</li>
+          <li><b>Live Preview</b> — real-time code preview with prefix stripping and column customization</li>
+          <li><b>Templates</b> — customizable Velocity templates with <code>$tool</code> and <code>$callback</code></li>
+        </ul>
+
+        <h3>Validation</h3>
+        <ul>
+          <li><b>Route Conflicts</b> — cross-file duplicate route detection with click-to-navigate</li>
+          <li><b>DI Validation</b> — validates <code>#[inject(component)]</code> and <code>#[inject(config)]</code> types</li>
+          <li><b>auto_config Completion</b> — <code>WebConfigurator</code>, <code>JobConfigurator</code></li>
         </ul>
 
         <h3>Other Features</h3>
         <ul>
-          <li>Custom icons for <code>app.toml</code> and <code>main.rs</code></li>
+          <li><b>New Project Wizard</b> — plugin selection, crates.io dependency search, example code</li>
+          <li><b>JSON to Rust Struct</b> — convert JSON to Rust structs with serde attributes</li>
+          <li><b>Run Configuration</b> — dedicated spring-rs run config with gutter icon</li>
+          <li>Custom icons for <code>app.toml</code> config files</li>
           <li>Auto-detection via <code>Cargo.toml</code> dependencies</li>
         </ul>
 
-        <p><b>Requires:</b> RustRover 2024.1+ or IntelliJ IDEA Ultimate 2023.3+ with Rust plugin</p>
+        <p><b>Requires:</b> RustRover 2025.1+ or IntelliJ IDEA 2023.3+ with Rust plugin</p>
         <p><a href="https://github.com/ouywm/intellij-spring-rs">GitHub</a></p>
     ]]></description>
 
     <!-- Change notes -->
     <change-notes><![CDATA[
+        <b>0.2.0</b>
+        <ul>
+          <li>Search Everywhere for routes, jobs, stream listeners, components</li>
+          <li>Environment variable completion, validation, documentation, navigation in TOML</li>
+          <li>Unified tool window with 6 item types and module/type filters</li>
+          <li>Gutter line markers for jobs, stream listeners, cache, sa-token, Socket.IO, middlewares</li>
+          <li>Sea-ORM code generation with live preview, templates, and multi-dialect support</li>
+          <li>Route conflict detection across files with click-to-navigate QuickFix</li>
+          <li>DI validation for #[inject(component)] and #[inject(config)]</li>
+          <li>Dynamic framework type detection based on Cargo dependencies</li>
+          <li>New project wizard with plugin selection and crates.io search</li>
+          <li>#[auto_config] completion for WebConfigurator, JobConfigurator</li>
+          <li>Unified scanner: 4x performance improvement for large projects</li>
+          <li>Settings page with type mapping and template editor</li>
+        </ul>
         <b>0.1.0</b> — Initial Release
         <ul>
           <li>TOML config support: completion, navigation, validation, documentation</li>

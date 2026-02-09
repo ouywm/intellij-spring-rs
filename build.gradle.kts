@@ -92,8 +92,6 @@ intellijPlatform {
             untilBuild = ijUntilBuild
         }
 
-        changeNotes = """
-        """.trimIndent()
     }
 
     // Work around local environment JDK/layout issues during instrumentation.
