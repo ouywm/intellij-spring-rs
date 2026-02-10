@@ -26,7 +26,7 @@ object SpringRsIndexingUtil {
 
         DumbService.getInstance(project).runWhenSmart {
             try {
-                // Use restart() without parameters - restarts highlighting for all open files  TODO 已处理 DEPRECATION
+                // Use restart() without parameters - restarts highlighting for all open files
                 DaemonCodeAnalyzer.getInstance(project).restart()
             } finally {
                 scheduled.set(false)

@@ -1,13 +1,20 @@
+#set($needsSet = !$insertColumns.isEmpty() || !$updateColumns.isEmpty())
 #if(!$queryColumns.isEmpty())
 use ${entityModulePath}::${moduleName};
 #end
 use ${entityModulePath}::${moduleName}::ActiveModel;
+#if($needsPrelude)
 use sea_orm::prelude::*;
+#end
 use sea_orm::sea_query::IntoCondition;
-#if(!$queryColumns.isEmpty())
+#if(!$queryColumns.isEmpty() && $needsSet)
 use sea_orm::{ColumnTrait, Condition, Set};
-#else
+#elseif(!$queryColumns.isEmpty())
+use sea_orm::{ColumnTrait, Condition};
+#elseif($needsSet)
 use sea_orm::{Condition, Set};
+#else
+use sea_orm::Condition;
 #end
 use serde::Deserialize;
 #if($addBon)
@@ -16,7 +23,7 @@ use bon::Builder;
 #if($addValidate)
 use validator::Validate;
 #end
-#if($needsDecimal)
+#if($needsDecimal && !$needsPrelude)
 use rust_decimal::Decimal;
 #end
 #if($tableComment != "")
@@ -34,9 +41,9 @@ pub struct $dtoCreateName {
 #end
 #if($addValidate && $column.rustType == "String" && !$column.isNullable)
 #if($column.comment != "")
-    #[validate(length(min = 1, message = "${column.comment}不能为空"))]
+    #[validate(length(min = 1, message = "$validateNotEmpty.replace("{0}", $column.comment)"))]
 #else
-    #[validate(length(min = 1, message = "${column.fieldName}不能为空"))]
+    #[validate(length(min = 1, message = "$validateNotEmpty.replace("{0}", $column.fieldName)"))]
 #end
 #end
     pub $column.fieldName: $column.fullRustType,
@@ -44,7 +51,11 @@ pub struct $dtoCreateName {
 }
 
 impl From<$dtoCreateName> for ActiveModel {
+#if($insertColumns.isEmpty())
+    fn from(_dto: $dtoCreateName) -> Self {
+#else
     fn from(dto: $dtoCreateName) -> Self {
+#end
         Self {
 #foreach($column in $insertColumns)
             $column.fieldName: Set(dto.$column.fieldName),
@@ -68,9 +79,9 @@ pub struct $dtoUpdateName {
 #end
 #if($addValidate && $column.rustType == "String" && !$column.isNullable)
 #if($column.comment != "")
-    #[validate(length(min = 1, message = "${column.comment}不能为空"))]
+    #[validate(length(min = 1, message = "$validateNotEmpty.replace("{0}", $column.comment)"))]
 #else
-    #[validate(length(min = 1, message = "${column.fieldName}不能为空"))]
+    #[validate(length(min = 1, message = "$validateNotEmpty.replace("{0}", $column.fieldName)"))]
 #end
 #end
     pub $column.fieldName: $column.fullRustType,
@@ -78,7 +89,11 @@ pub struct $dtoUpdateName {
 }
 
 impl From<$dtoUpdateName> for ActiveModel {
+#if($updateColumns.isEmpty())
+    fn from(_dto: $dtoUpdateName) -> Self {
+#else
     fn from(dto: $dtoUpdateName) -> Self {
+#end
         Self {
 #foreach($column in $updateColumns)
             $column.fieldName: Set(dto.$column.fieldName),

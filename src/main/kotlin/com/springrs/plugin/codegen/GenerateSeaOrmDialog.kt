@@ -408,11 +408,11 @@ class GenerateSeaOrmDialog(
         panel.border = BorderFactory.createTitledBorder(SpringRsBundle.message("codegen.output.title"))
         var row = 0
 
-        addFormRow(panel, row++, "entity folder:", entityDirField)
-        addFormRow(panel, row++, "dto folder:", dtoDirField)
-        addFormRow(panel, row++, "vo folder:", voDirField)
-        addFormRow(panel, row++, "service folder:", serviceDirField)
-        addFormRow(panel, row, "route folder:", routeDirField)
+        addFormRow(panel, row++, SpringRsBundle.message("codegen.output.entity.folder"), entityDirField)
+        addFormRow(panel, row++, SpringRsBundle.message("codegen.output.dto.folder"), dtoDirField)
+        addFormRow(panel, row++, SpringRsBundle.message("codegen.output.vo.folder"), voDirField)
+        addFormRow(panel, row++, SpringRsBundle.message("codegen.output.service.folder"), serviceDirField)
+        addFormRow(panel, row, SpringRsBundle.message("codegen.output.route.folder"), routeDirField)
         return panel
     }
 
@@ -489,13 +489,13 @@ class GenerateSeaOrmDialog(
     private fun createLayerTabs(): JBTabbedPane {
         val tabs = JBTabbedPane()
 
-        tabs.addTab("Entity", createTabPanel(entityCheckBox))
-        tabs.addTab("DTO", createTabPanel(dtoCheckBox,
+        tabs.addTab(SpringRsBundle.message("codegen.layer.entity"), createTabPanel(entityCheckBox))
+        tabs.addTab(SpringRsBundle.message("codegen.layer.dto"), createTabPanel(dtoCheckBox,
             checkboxRow(dtoBuilderCheckBox, dtoValidateCheckBox)))
-        tabs.addTab("VO", createTabPanel(voCheckBox,
+        tabs.addTab(SpringRsBundle.message("codegen.layer.vo"), createTabPanel(voCheckBox,
             checkboxRow(voBuilderCheckBox, voJsonSchemaCheckBox)))
-        tabs.addTab("Service", createTabPanel(serviceCheckBox))
-        tabs.addTab("Route", createTabPanel(routeCheckBox, JPanel(BorderLayout(8, 0)).apply {
+        tabs.addTab(SpringRsBundle.message("codegen.layer.service"), createTabPanel(serviceCheckBox))
+        tabs.addTab(SpringRsBundle.message("codegen.layer.route"), createTabPanel(routeCheckBox, JPanel(BorderLayout(8, 0)).apply {
             alignmentX = Component.LEFT_ALIGNMENT
             add(JBLabel(SpringRsBundle.message("codegen.route.prefix")), BorderLayout.WEST)
             add(routePrefixField, BorderLayout.CENTER)

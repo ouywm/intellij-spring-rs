@@ -10,23 +10,39 @@ import java.io.File
  * - **prelude.rs**: Incremental merge (append new entity re-exports).
  * - **Existing files**: Conflict resolution via user dialog (Skip/Overwrite/Backup).
  * - **New files**: Direct write.
+ *
+ * Two-phase approach to avoid showing dialogs inside write actions:
+ * 1. [detectConflicts] — scan for conflicts (no write action needed)
+ * 2. [writeFiles] — write all files using pre-resolved decisions (inside write action)
  */
 object CodegenExecutor {
 
     /**
-     * Write all planned files to disk.
+     * Phase 1: Detect which planned files conflict with existing files on disk.
+     *
+     * @return List of absolute file paths that already exist and are not mod.rs/prelude.rs.
+     */
+    fun detectConflicts(basePath: String, files: List<GeneratedFile>): List<String> {
+        return files.mapNotNull { gf ->
+            val file = File(basePath, gf.relativePath)
+            if (file.exists() && file.name != "mod.rs" && file.name != "prelude.rs") {
+                file.path
+            } else null
+        }
+    }
+
+    /**
+     * Phase 2: Write all planned files to disk.
      *
      * @param basePath           Project base path (absolute).
      * @param files              Planned files from [CodegenPlan.plan].
-     * @param layers             Layer configs (for future extensibility).
-     * @param conflictResolver   Callback to resolve file conflicts (returns [ConflictResolution]).
+     * @param resolutions        Pre-resolved conflict decisions (file path → resolution).
      * @return List of files that were written or modified.
      */
     fun writeFiles(
         basePath: String,
         files: List<GeneratedFile>,
-        layers: List<LayerConfig>,
-        conflictResolver: (filePath: String) -> ConflictResolution
+        resolutions: Map<String, ConflictResolution> = emptyMap()
     ): List<File> {
         val writtenFiles = mutableListOf<File>()
 
@@ -53,9 +69,19 @@ object CodegenExecutor {
                     file.writeText(merged)
                 }
 
-                // Existing files: conflict resolution
+                // Existing files: use pre-resolved conflict decision
                 file.exists() -> {
-                    handleConflict(file, gf.content, conflictResolver) ?: continue
+                    val resolution = resolutions[file.path] ?: ConflictResolution.SKIP
+                    when (resolution) {
+                        ConflictResolution.SKIP -> continue
+                        ConflictResolution.BACKUP -> {
+                            file.copyTo(File(file.path + ".bak"), overwrite = true)
+                            file.writeText(gf.content)
+                        }
+                        ConflictResolution.OVERWRITE -> {
+                            file.writeText(gf.content)
+                        }
+                    }
                 }
 
                 // New file: direct write
@@ -64,29 +90,5 @@ object CodegenExecutor {
             writtenFiles.add(file)
         }
         return writtenFiles
-    }
-
-    /**
-     * Handle file conflict: resolve via callback, apply resolution.
-     *
-     * @return The file if it should be counted as written, or `null` if skipped.
-     */
-    private fun handleConflict(
-        file: File,
-        newContent: String,
-        conflictResolver: (String) -> ConflictResolution
-    ): File? {
-        return when (conflictResolver(file.path)) {
-            ConflictResolution.SKIP -> null
-            ConflictResolution.BACKUP -> {
-                file.copyTo(File(file.path + ".bak"), overwrite = true)
-                file.writeText(newContent)
-                file
-            }
-            ConflictResolution.OVERWRITE -> {
-                file.writeText(newContent)
-                file
-            }
-        }
     }
 }

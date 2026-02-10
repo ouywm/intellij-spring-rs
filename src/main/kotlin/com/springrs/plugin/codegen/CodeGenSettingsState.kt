@@ -26,7 +26,7 @@ class CodeGenSettingsState : PersistentStateComponent<CodeGenSettingsState> {
     // ── Layer switches ──
     var generateEntity: Boolean = true
     var generateDto: Boolean = true
-    var generateVo: Boolean = false
+    var generateVo: Boolean = true
     var generateService: Boolean = true
     var generateRoute: Boolean = true
 

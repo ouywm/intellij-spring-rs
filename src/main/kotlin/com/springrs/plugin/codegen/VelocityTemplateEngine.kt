@@ -128,8 +128,11 @@ object VelocityTemplateEngine {
         relations: List<RelationInfo> = emptyList()
     ): MutableMap<String, Any?> {
         val columns = table.columns.map { it.toContextMap() }
-        val insertColumns = table.insertColumns.map { it.toContextMap() }
-        val updateColumns = table.updateColumns.map { it.toUpdateContextMap() }
+        // Filter out #[sea_orm(ignore)] columns from DTO/Query layers.
+        // Ignored columns exist in Model struct but NOT in ActiveModel or Column enum,
+        // so they cannot be used in Set(), Column::Xxx, or IntoCondition.
+        val insertColumns = table.insertColumns.filter { !isSeaOrmIgnored(it) }.map { it.toContextMap() }
+        val updateColumns = table.updateColumns.filter { !isSeaOrmIgnored(it) }.map { it.toUpdateContextMap() }
 
         // ── Timestamp detection ──
         val hasCreatedAt = table.columns.any { it.name in CREATED_AT_COLUMNS }
@@ -167,7 +170,7 @@ object VelocityTemplateEngine {
             "columns" to columns,
             "insertColumns" to insertColumns,
             "updateColumns" to updateColumns,
-            "queryColumns" to table.queryColumns.map { it.toContextMap() },
+            "queryColumns" to table.queryColumns.filter { !isSeaOrmIgnored(it) }.map { it.toContextMap() },
 
             // ── Primary key ──
             "primaryKeyType" to table.primaryKeyType,
@@ -245,8 +248,11 @@ object VelocityTemplateEngine {
             "isDateTimeType" to (rustType in DATE_TIME_TYPES),
             "isUuidType" to (rustType == "Uuid"),
             "isVoConvertType" to (rustType in VO_STRING_CONVERT_TYPES),
+            "isVoVecConvertType" to (rustType.startsWith("Vec<") &&
+                rustType.removePrefix("Vec<").removeSuffix(">") in VO_STRING_CONVERT_TYPES),
             "isStringType" to (rustType == "String"),
             "isVirtual" to isVirtual,
+            "isIgnored" to isCustomPgType,
             "comment" to (comment ?: ""),
             "defaultValue" to (defaultValue ?: ""),
             "voRustType" to voRustType(),
@@ -335,6 +341,15 @@ object VelocityTemplateEngine {
             // TEXT → annotate as "Text" (sea-orm defaults String to varchar, but DB column is text)
             baseType == "text" -> "Text"
 
+            // Float (real/float4) → annotate as "Float" (sea-orm needs explicit Float annotation)
+            baseType in FLOAT_TYPES -> "Float"
+
+            // Double (double precision/float8) → annotate as "Double"
+            baseType in DOUBLE_TYPES -> "Double"
+
+            // bytea → annotate as VarBinary (sea-orm maps Vec<u8> but needs explicit column_type)
+            baseType == "bytea" -> "VarBinary(StringLen::None)"
+
             // Decimal/Numeric with precision → Decimal(Some((p, s)))
             baseType in DECIMAL_TYPES -> {
                 val match = DECIMAL_PRECISION_REGEX.find(normalized)
@@ -366,7 +381,7 @@ object VelocityTemplateEngine {
      * Returns null if no attribute is needed (plain columns without special annotations).
      *
      * Combines all sea-orm attribute parts in the standard order:
-     * `primary_key, auto_increment = false, column_type = "...", select_as = "...", unique, nullable`
+     * `ignore, primary_key, auto_increment = false, column_type = "...", select_as = "...", unique, nullable`
      *
      * Aligned with `sea-orm-cli 2.0` output format.
      */
@@ -381,6 +396,13 @@ object VelocityTemplateEngine {
     ): String? {
         val parts = mutableListOf<String>()
 
+        // Custom PG types use `ignore` — excluded from standard sea-orm CRUD operations.
+        // This matches sea-orm-codegen 2.0 behavior. The column is still present in the struct
+        // but sea-orm won't include it in auto-generated SELECT/INSERT/UPDATE statements.
+        if (isCustomPgType && rawSqlBaseType.isNotEmpty()) {
+            parts.add("ignore")
+        }
+
         if (isPrimaryKey) {
             parts.add("primary_key")
             if (!isAutoIncrement) parts.add("auto_increment = false")
@@ -390,14 +412,10 @@ object VelocityTemplateEngine {
             parts.add("column_type = \"$columnType\"")
         }
 
-        // Custom PG types (inet, macaddr, etc.) need select_as/save_as for bi-directional CAST:
-        // - select_as = "text"       → CAST(column AS text) in SELECT queries
-        // - save_as = "inet" (raw)   → CAST($value AS inet) in INSERT/UPDATE queries
-        // Without save_as, PG rejects: "column is of type inet but expression is of type text"
-        // Note: save_as uses the raw SQL type name, NOT the ColumnType enum format.
+        // Custom PG types: select_as = "text" → CAST(column AS text) in raw SELECT queries.
+        // No save_as — matches sea-orm-codegen 2.0 (these types are read-only via ORM).
         if (isCustomPgType && rawSqlBaseType.isNotEmpty()) {
             parts.add("select_as = \"text\"")
-            parts.add("save_as = \"$rawSqlBaseType\"")
         }
 
         if (isUnique && !isPrimaryKey) {
@@ -416,22 +434,58 @@ object VelocityTemplateEngine {
     /** Regex to strip type parameters like `(10,2)` from type names. */
     private val PARAM_STRIP_REGEX = Regex("\\(.*\\)")
 
+    /**
+     * Check if a column will be marked with `#[sea_orm(ignore)]`.
+     *
+     * Ignored columns exist in the Entity `Model` struct but are NOT present in
+     * `ActiveModel` or `Column` enum. Therefore they must be excluded from
+     * DTO (insert/update) and Query (filter) layers.
+     *
+     * Internal visibility so [DtoLayer] can also filter for `needsPrelude`/`needsDecimal`.
+     */
+    internal fun isSeaOrmIgnored(col: ColumnInfo): Boolean {
+        if (col.isVirtual) return true
+        val normalizedSqlBase = PARAM_STRIP_REGEX.replace(col.sqlType.trim().lowercase(), "").trim()
+        return normalizedSqlBase in PG_CUSTOM_STRING_TYPES
+    }
+
     /** Regex to extract precision and scale from `numeric(10, 2)`. */
     private val DECIMAL_PRECISION_REGEX = Regex("\\((\\d+)\\s*,\\s*(\\d+)\\)")
 
     /** SQL type names for decimal/numeric types. */
     private val DECIMAL_TYPES = setOf("numeric", "decimal")
 
+    /** SQL type names for single-precision float (→ column_type = "Float"). */
+    private val FLOAT_TYPES = setOf("real", "float4")
+
+    /** SQL type names for double-precision float (→ column_type = "Double"). */
+    private val DOUBLE_TYPES = setOf("double precision", "float8")
+
     /**
      * PG types that map to Rust `String` but are NOT varchar/text compatible.
-     * Sea-ORM needs `#[sea_orm(column_type = "custom(\"xxx\")")]` to avoid type mismatch.
+     *
+     * These types generate `#[sea_orm(ignore, column_type = "custom(\"xxx\")", select_as = "text")]`
+     * — aligned with `sea-orm-codegen 2.0` output.
+     *
+     * Note: `interval` is excluded — sea-orm CLI treats it as plain String without annotation.
+     * Note: `bit`/`varbit` are excluded — mapped to Vec<u8> (natively supported by sea-orm).
      */
     private val PG_CUSTOM_STRING_TYPES = setOf(
-        "inet", "macaddr", "macaddr8",
-        "bit", "varbit", "bit varying",
-        "xml", "interval",
+        // Network
+        "inet", "cidr", "macaddr", "macaddr8",
+        // XML
+        "xml",
+        // Geometric
         "point", "line", "lseg", "box", "path", "polygon", "circle",
-        "tsvector", "tsquery"
+        // Text search
+        "tsvector", "tsquery",
+        // System
+        "oid", "pg_lsn", "name",
+        // Range types (PG 9.2+)
+        "int4range", "int8range", "numrange", "tsrange", "tstzrange", "daterange",
+        // Multirange types (PG 14+)
+        "int4multirange", "int8multirange", "nummultirange",
+        "tsmultirange", "tstzmultirange", "datemultirange"
     )
 
     /** Column names that represent "created at" timestamps. */
@@ -442,10 +496,20 @@ object VelocityTemplateEngine {
 
 
     /**
-     * VO Rust type: DateTime/Uuid types → String for JSON serialization & JsonSchema compatibility.
+     * VO Rust type: DateTime/Uuid/Decimal/Json types → String for JSON serialization & JsonSchema compatibility.
+     *
+     * Handles both scalar types (`Uuid` → `String`) and Vec types (`Vec<Uuid>` → `Vec<String>`).
+     * This avoids schemars version conflicts (0.8 vs 1.2) for Uuid/Json in JsonSchema derive.
      */
     private fun ColumnInfo.voRustType(): String {
-        val baseType = if (rustType in VO_STRING_CONVERT_TYPES) "String" else rustType
+        val baseType = when {
+            rustType in VO_STRING_CONVERT_TYPES -> "String"
+            rustType.startsWith("Vec<") -> {
+                val inner = rustType.removePrefix("Vec<").removeSuffix(">")
+                if (inner in VO_STRING_CONVERT_TYPES) "Vec<String>" else rustType
+            }
+            else -> rustType
+        }
         return if (isNullable) "Option<$baseType>" else baseType
     }
 }

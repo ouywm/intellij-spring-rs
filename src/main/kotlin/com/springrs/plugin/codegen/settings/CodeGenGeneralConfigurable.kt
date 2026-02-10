@@ -4,6 +4,7 @@ import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.ui.IdeBorderFactory
+import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
@@ -140,11 +141,11 @@ class CodeGenGeneralConfigurable(private val project: Project) : Configurable {
         routeDirField = JBTextField(settings.routeOutputDir)
 
         val outputPanel = FormBuilder.createFormBuilder()
-            .addLabeledComponent("Entity:", entityDirField!!)
-            .addLabeledComponent("DTO:", dtoDirField!!)
-            .addLabeledComponent("VO:", voDirField!!)
-            .addLabeledComponent("Service:", serviceDirField!!)
-            .addLabeledComponent("Route:", routeDirField!!)
+            .addLabeledComponent(SpringRsBundle.message("codegen.output.entity.folder"), entityDirField!!)
+            .addLabeledComponent(SpringRsBundle.message("codegen.output.dto.folder"), dtoDirField!!)
+            .addLabeledComponent(SpringRsBundle.message("codegen.output.vo.folder"), voDirField!!)
+            .addLabeledComponent(SpringRsBundle.message("codegen.output.service.folder"), serviceDirField!!)
+            .addLabeledComponent(SpringRsBundle.message("codegen.output.route.folder"), routeDirField!!)
             .panel
         outputPanel.border = IdeBorderFactory.createTitledBorder(
             SpringRsBundle.message("codegen.settings.general.output.section")
@@ -179,7 +180,17 @@ class CodeGenGeneralConfigurable(private val project: Project) : Configurable {
             settings.runRustfmtAfterGeneration
         )
 
-        conflictStrategyCombo = ComboBox(arrayOf("ASK", "SKIP", "OVERWRITE", "BACKUP"))
+        conflictStrategyCombo = ComboBox(arrayOf("ASK", "SKIP", "OVERWRITE", "BACKUP")).apply {
+            renderer = SimpleListCellRenderer.create("") { value ->
+                when (value) {
+                    "ASK" -> SpringRsBundle.message("codegen.settings.general.conflict.ask")
+                    "SKIP" -> SpringRsBundle.message("codegen.settings.general.conflict.skip")
+                    "OVERWRITE" -> SpringRsBundle.message("codegen.settings.general.conflict.overwrite")
+                    "BACKUP" -> SpringRsBundle.message("codegen.settings.general.conflict.backup")
+                    else -> value
+                }
+            }
+        }
 
         val formatPanel = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)

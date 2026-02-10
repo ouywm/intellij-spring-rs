@@ -1,6 +1,7 @@
 package com.springrs.plugin.codegen.layer
 
 import com.intellij.openapi.project.Project
+import com.springrs.plugin.SpringRsBundle
 import com.springrs.plugin.codegen.*
 import com.springrs.plugin.utils.SpringRsConstants.DERIVE_BUILDER
 import com.springrs.plugin.utils.SpringRsConstants.DERIVE_CLONE
@@ -78,9 +79,13 @@ class EntityLayer(
     override fun generate(table: TableInfo, project: Project): String {
         val relations = relationsMap[table.name.lowercase()].orEmpty()
         val derives = derivesOverrides[table.name] ?: extraDerives
+        // f32/f64 don't implement Eq/Hash — auto-exclude when float columns present
+        val hasFloat = table.columns.any { col -> FLOAT_TYPES.any { it in col.rustType } }
+        val effectiveBaseDerives = if (hasFloat) ENTITY_BASE_DERIVES.filter { it != DERIVE_EQ } else ENTITY_BASE_DERIVES
+        val effectiveExtraDerives: Set<String> = if (hasFloat) derives.filter { it != DERIVE_EQ && it != "Hash" }.toSet() else derives
         return try {
             VelocityTemplateEngine.generateFromTemplate(project, templateName, table, relations) { ctx ->
-                ctx.putDerives("baseDerives", ENTITY_BASE_DERIVES, derives)
+                ctx.putDerives("baseDerives", effectiveBaseDerives, effectiveExtraDerives)
                 ctx["addSerde"] = DERIVE_SERIALIZE in derives || DERIVE_DESERIALIZE in derives
                 ctx["addBon"] = DERIVE_BUILDER in derives
                 ctx["addJsonSchema"] = DERIVE_JSON_SCHEMA in derives
@@ -104,6 +109,9 @@ class EntityLayer(
         val ENTITY_BASE_DERIVES = listOf(
             DERIVE_CLONE, DERIVE_DEBUG, DERIVE_PARTIAL_EQ, DERIVE_EQ, SEA_ORM_DERIVE_ENTITY_MODEL
         )
+
+        /** Rust float types that don't implement Eq/Hash. */
+        private val FLOAT_TYPES = setOf("f32", "f64")
 
         /**
          * String-building fallback — no project / template engine dependency.
@@ -177,15 +185,25 @@ class DtoLayer(
 
     override fun generate(table: TableInfo, project: Project): String {
         val derives = derivesOverrides[table.name] ?: extraDerives
+        // Filter out #[sea_orm(ignore)] columns — they are not in ActiveModel or Column enum
+        val allDtoColumns = (table.insertColumns + table.updateColumns + table.queryColumns)
+            .filter { !VelocityTemplateEngine.isSeaOrmIgnored(it) }
         return VelocityTemplateEngine.generateFromTemplate(project, templateName, table) { ctx ->
             ctx.putDerives("dtoBaseDerives", DTO_BASE_DERIVES, derives)
             ctx["addBon"] = DERIVE_BUILDER in derives
             ctx["addValidate"] = DERIVE_VALIDATE in derives
+            ctx["validateNotEmpty"] = SpringRsBundle.message("codegen.validate.not.empty", "{0}")
+            ctx["needsPrelude"] = allDtoColumns.any { col ->
+                SEA_ORM_PRELUDE_TYPES.any { it in col.rustType }
+            }
+            ctx["needsDecimal"] = allDtoColumns.any { "Decimal" in it.rustType }
         }
     }
 
     companion object {
         private val DTO_BASE_DERIVES = listOf(DERIVE_DEBUG, DERIVE_DESERIALIZE)
+        /** Types from sea_orm::prelude that need explicit import in DTO */
+        private val SEA_ORM_PRELUDE_TYPES = setOf("Uuid", "Json", "DateTime", "DateTimeWithTimeZone", "Date", "Time", "Decimal")
     }
 }
 
@@ -210,6 +228,11 @@ class VoLayer(
             ctx.putDerives("voBaseDerives", VO_BASE_DERIVES, derives)
             ctx["addBon"] = DERIVE_BUILDER in derives
             ctx["addJsonSchema"] = DERIVE_JSON_SCHEMA in derives
+            // All scalar Uuid/Json/Decimal → String, all Vec<Uuid>/Vec<Json>/Vec<Decimal> → Vec<String>
+            // So these imports are never needed in the VO layer
+            ctx["voNeedsUuid"] = false
+            ctx["voNeedsJson"] = false
+            ctx["voNeedsDecimal"] = false
         }
     }
 

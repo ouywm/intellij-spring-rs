@@ -136,13 +136,26 @@ class TypeMappingEntry() {
             TypeMappingEntry("json", "Json", MatchType.EXACT),
             TypeMappingEntry("jsonb", "Json", MatchType.EXACT),
             TypeMappingEntry("bytea", "Vec<u8>", MatchType.EXACT),
-            TypeMappingEntry("oid", "u32", MatchType.EXACT),
+            TypeMappingEntry("bit", "Vec<u8>", MatchType.EXACT),
+            TypeMappingEntry("varbit", "Vec<u8>", MatchType.EXACT),
+            TypeMappingEntry("bit varying", "Vec<u8>", MatchType.EXACT),
+            TypeMappingEntry("oid", "String", MatchType.EXACT),
+            TypeMappingEntry("pg_lsn", "String", MatchType.EXACT),
 
             // Network / Geo / Others → String
             TypeMappingEntry("inet", "String", MatchType.EXACT),
             TypeMappingEntry("macaddr", "String", MatchType.EXACT),
             TypeMappingEntry("xml", "String", MatchType.EXACT),
             TypeMappingEntry("interval", "String", MatchType.EXACT),
+            TypeMappingEntry("name", "String", MatchType.EXACT),
+
+            // Range types → String
+            TypeMappingEntry("int4range", "String", MatchType.EXACT),
+            TypeMappingEntry("int8range", "String", MatchType.EXACT),
+            TypeMappingEntry("numrange", "String", MatchType.EXACT),
+            TypeMappingEntry("tsrange", "String", MatchType.EXACT),
+            TypeMappingEntry("tstzrange", "String", MatchType.EXACT),
+            TypeMappingEntry("daterange", "String", MatchType.EXACT),
         )
 
         private fun mysqlDefaults(): List<TypeMappingEntry> = listOf(

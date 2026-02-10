@@ -73,6 +73,11 @@ impl $serviceName {
 #else
     /// Update an existing record.
     pub async fn update(&self, pk: ${primaryKeyType}, dto: ${dtoUpdateName}) -> Result<${voName}> {
+#if($primaryKeyType == "String")
+## String is not Copy — must clone before find_by_id consumes it
+        ${entityName}::find_by_id(pk.clone())
+#else
+## i32, i64, Uuid etc. are Copy — no clone needed
         ${entityName}::find_by_id(pk)
             .one(&self.db)
             .await

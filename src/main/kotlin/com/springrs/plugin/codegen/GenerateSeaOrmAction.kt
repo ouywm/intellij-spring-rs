@@ -104,29 +104,48 @@ class GenerateSeaOrmAction : AnAction() {
 
         var firstGeneratedFile: File? = null
 
+        // Prepare data outside write action
+        val layerConfigs: List<LayerConfig>?
+        val generatedOutputDirs: List<String>
+        val plan: List<GeneratedFile>?
+
+        if (previewFiles != null) {
+            layerConfigs = null
+            generatedOutputDirs = emptyList()
+            plan = null
+        } else {
+            layerConfigs = buildLayerConfigs(dialog, project, relationsMap)
+            generatedOutputDirs = layerConfigs.filter { it.enabled }.map { it.outputDir }
+            plan = CodegenPlan.plan(layerConfigs, effectiveTableInfos, project)
+        }
+
+        // Phase 1: Detect conflicts and resolve via dialog (OUTSIDE write action)
+        val resolutions = mutableMapOf<String, ConflictResolution>()
+        if (plan != null) {
+            val conflicts = CodegenExecutor.detectConflicts(basePath, plan)
+            for (path in conflicts) {
+                val resolution = resolveConflict(project, path)
+                resolutions[path] = resolution
+            }
+        }
+
+        // Phase 2: Write files (INSIDE write action)
         ApplicationManager.getApplication().runWriteAction {
             try {
                 val allFiles: List<File>
-                val generatedOutputDirs: List<String>
 
                 if (previewFiles != null) {
                     val result = writePreviewFiles(basePath, previewFiles)
                     allFiles = result.first
-                    generatedOutputDirs = result.second
-                } else {
-                    // Build layer configs
-                    val layerConfigs = buildLayerConfigs(dialog, project, relationsMap)
-                    generatedOutputDirs = layerConfigs.filter { it.enabled }.map { it.outputDir }
-
-                    // Plan + Execute — unified path
-                    val plan = CodegenPlan.plan(layerConfigs, effectiveTableInfos, project)
-                    allFiles = CodegenExecutor.writeFiles(basePath, plan, layerConfigs) { path ->
-                        resolveConflict(project, path)
+                    val previewOutputDirs = result.second
+                    if (previewOutputDirs.isNotEmpty()) {
+                        updateCrateRoot(basePath, previewOutputDirs)
                     }
-                }
-
-                if (generatedOutputDirs.isNotEmpty()) {
-                    updateCrateRoot(basePath, generatedOutputDirs)
+                } else {
+                    allFiles = CodegenExecutor.writeFiles(basePath, plan!!, resolutions)
+                    if (generatedOutputDirs.isNotEmpty()) {
+                        updateCrateRoot(basePath, generatedOutputDirs)
+                    }
                 }
 
                 val formattedCount = RustFormatter.formatFiles(allFiles)

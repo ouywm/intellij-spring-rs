@@ -49,7 +49,12 @@ object TableMetadataReader {
 
         val columns = mutableListOf<ColumnInfo>()
         for (col in DasUtil.getColumns(table)) {
-            val sqlType = col.dasType.typeClass.name
+            // Prefer specification (includes precision, e.g., "numeric(20,6)", "timestamptz(3)")
+            // over typeClass.name (just base name, e.g., "numeric", "timestamptz").
+            // This ensures Decimal precision, Float/Double annotations, and timestamp timezone
+            // info are correctly preserved for sea-orm column_type generation.
+            val sqlType = col.dasType.specification.takeIf { it.isNotBlank() }
+                ?: col.dasType.typeClass.name
             val isPk = col.name in primaryKeyNames
             val isNullable = !col.isNotNull && !isPk
 

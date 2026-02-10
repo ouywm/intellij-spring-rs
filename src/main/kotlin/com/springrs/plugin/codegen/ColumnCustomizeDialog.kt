@@ -27,7 +27,7 @@ import javax.swing.table.TableCellEditor
  * - **Add/remove virtual columns** (not in database)
  * - **Edit ext properties** per column (accessible as `$column.ext.key` in templates)
  *
- * Inspired by MyBatisCodeHelper-Pro "定制列" + EasyCode ColumnConfig.
+ * Inspired by MyBatisCodeHelper-Pro "Column Customize" + EasyCode ColumnConfig.
  */
 class ColumnCustomizeDialog(
     project: Project,

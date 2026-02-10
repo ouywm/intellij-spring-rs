@@ -45,20 +45,29 @@ object PostgresDialect : DatabaseDialect {
         "jsonb" to "Json",
         "bytea" to "Vec<u8>",
         "inet" to "String", "macaddr" to "String", "macaddr8" to "String",
-        "bit" to "String", "varbit" to "String", "bit varying" to "String",
+        "bit" to "Vec<u8>", "varbit" to "Vec<u8>", "bit varying" to "Vec<u8>",
         "xml" to "String", "interval" to "String",
         "point" to "String", "line" to "String", "lseg" to "String",
         "box" to "String", "path" to "String", "polygon" to "String",
         "circle" to "String", "tsvector" to "String", "tsquery" to "String",
-        "oid" to "u32",
+        "oid" to "String", "pg_lsn" to "String",
+
+        // Range types (PG 9.2+)
+        "int4range" to "String", "int8range" to "String", "numrange" to "String",
+        "tsrange" to "String", "tstzrange" to "String", "daterange" to "String",
+        // Multirange types (PG 14+)
+        "int4multirange" to "String", "int8multirange" to "String", "nummultirange" to "String",
+        "tsmultirange" to "String", "tstzmultirange" to "String", "datemultirange" to "String",
     )
 
     override fun toRustType(sqlType: String): String {
         val normalized = sqlType.trim().lowercase()
 
-        // PG array: "int4[]"
+        // PG array: "int4[]", "integer[][]" — strip ALL trailing [] to get base element type
+        // sea-orm uses flat Vec<T> for all PG array dimensions
         if (normalized.endsWith("[]")) {
-            return "Vec<${resolveFromMap(normalized.removeSuffix("[]"), TYPE_MAP)}>"
+            val baseType = normalized.replace(Regex("(\\[\\])+$"), "")
+            return "Vec<${resolveFromMap(baseType, TYPE_MAP)}>"
         }
         // PG internal array: "_int4"
         if (normalized.startsWith("_")) {

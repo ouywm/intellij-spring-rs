@@ -1,5 +1,14 @@
 use serde::Serialize;
 use ${entityModulePath}::${moduleName};
+#if($voNeedsUuid)
+use sea_orm::prelude::Uuid;
+#end
+#if($voNeedsJson)
+use sea_orm::prelude::Json;
+#end
+#if($voNeedsDecimal)
+use rust_decimal::Decimal;
+#end
 #if($addBon)
 use bon::Builder;
 #end
@@ -38,7 +47,13 @@ impl From<${moduleName}::Model> for $voName {
     fn from(model: ${moduleName}::Model) -> Self {
         Self {
 #foreach($column in $columns)
-#if($column.isVoConvertType && $column.isNullable)
+#if($column.isVoVecConvertType && $column.isNullable)
+## Option<Vec<T>> → Option<Vec<String>>
+            $column.fieldName: model.${column.fieldName}.map(#[[|v| v.into_iter().map(|x| x.to_string()).collect())]]#,
+#elseif($column.isVoVecConvertType)
+## Vec<T> → Vec<String>
+            $column.fieldName: model.${column.fieldName}.into_iter().map(#[[|x| x.to_string()]]#).collect(),
+#elseif($column.isVoConvertType && $column.isNullable)
 ## Velocity needs #[[ ]]# to escape Rust closure |v| syntax
             $column.fieldName: model.${column.fieldName}.map(#[[|v| v.to_string()]]#),
 #elseif($column.isVoConvertType)
